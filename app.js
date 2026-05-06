@@ -62,10 +62,17 @@
     }
 
     const formData = new FormData(refs.form);
+    const cpfDigits = cleanDigits(String(formData.get('cpf')));
+
+    if (!isValidCPF(cpfDigits)) {
+      setStatus('CPF inválido. Verifique o número informado.', 'warning');
+      return;
+    }
+
     const payload = {
       buyer: {
         name: String(formData.get('name')).trim(),
-        cpf: cleanDigits(String(formData.get('cpf'))),
+        cpf: cpfDigits,
         email: String(formData.get('email')).trim(),
         phone: String(formData.get('phone')).trim()
       },
@@ -179,11 +186,16 @@
   }
 
   async function savePurchaseToFirebase(data) {
-    if (!window.firebase || !config.FIREBASE_CONFIG || !config.FIREBASE_CONFIG.projectId) {
+    if (
+      !window.firebase ||
+      typeof firebase.initializeApp !== 'function' ||
+      !config.FIREBASE_CONFIG ||
+      !config.FIREBASE_CONFIG.projectId
+    ) {
       throw new Error('Firebase não configurado. Defina FIREBASE_CONFIG antes de usar.');
     }
 
-    if (!firebase.apps.length) {
+    if (!Array.isArray(firebase.apps) || !firebase.apps.length) {
       try {
         firebase.initializeApp(config.FIREBASE_CONFIG);
       } catch (firebaseInitError) {
@@ -203,6 +215,25 @@
 
   function cleanDigits(value) {
     return value.replace(/\D/g, '');
+  }
+
+  function isValidCPF(cpf) {
+    if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
+      return false;
+    }
+
+    const calcDigit = (base, factor) => {
+      let total = 0;
+      for (let i = 0; i < base.length; i += 1) {
+        total += Number(base[i]) * (factor - i);
+      }
+      const remainder = (total * 10) % 11;
+      return remainder === 10 ? 0 : remainder;
+    };
+
+    const firstDigit = calcDigit(cpf.slice(0, 9), 10);
+    const secondDigit = calcDigit(cpf.slice(0, 10), 11);
+    return firstDigit === Number(cpf[9]) && secondDigit === Number(cpf[10]);
   }
 
   function maskCPF(value) {
