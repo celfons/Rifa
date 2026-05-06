@@ -1,33 +1,62 @@
 # Rifa
 
-Site simples e responsivo de rifa com Bootstrap, JavaScript, SDK client do Mercado Pago e registro de compras no Firebase.
+Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto para deploy no **Cloudflare Workers** e **Cloudflare Pages Functions**.
 
 ## Funcionalidades
 - Seleção visual de números da rifa
 - Formulário com nome, CPF, telefone e e-mail
-- Início do pagamento via SDK client do Mercado Pago (`checkout`)
-- Confirmação de pagamento consultando backend
-- Registro da compra no Firestore (`rifaPurchases`) para disparo posterior de e-mail/SMS via trigger no Firebase
+- Pagamento com SDK client do Mercado Pago
+- APIs da rifa publicadas no backend Hono
+- Registro pós-confirmação no Firebase (Firestore) via API backend
 
-## Arquivos principais
-- `index.html`
-- `styles.css`
-- `app.js`
-- `config.example.js`
+## Estrutura
+- Front-end: `index.html`, `styles.css`, `app.js`, `config.example.js`
+- API Hono (Worker): `src/hono-app.ts`, `src/worker.ts`
+- API Hono (Pages Functions): `functions/[[path]].ts`
+- Configuração Cloudflare: `wrangler.toml`
 
-## Configuração
-1. Copie `config.example.js` para `config.js` e preencha com suas chaves reais.
-2. Configure no backend os endpoints:
-   - `POST /create-preference` → retorna `{ "preferenceId": "..." }`
-   - `GET /payment-status?preferenceId=...` → retorna `{ "status": "approved", "paymentId": "..." }`
-3. Publique uma Cloud Function/trigger do Firebase para escutar `rifaPurchases` e enviar e-mail/SMS.
+## Endpoints da API (Hono)
+- `GET /api/rifas` → lista rifas disponíveis
+- `POST /api/pagamentos/preferencia` → cria preferência no Mercado Pago
+- `GET /api/pagamentos/status?preferenceId=...` → consulta status de pagamento
+- `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no Firestore
 
-## Execução local
-Abra um servidor estático na raiz do projeto, por exemplo:
+## Configuração do front-end
+1. Copie `config.example.js` para `config.js`.
+2. Ajuste:
+   - `MERCADO_PAGO_PUBLIC_KEY`
+   - `API_BASE_URL` (em Cloudflare, normalmente `/api`)
+   - `RAFFLE_ID` (opcional)
 
-```bash
-cp config.example.js config.js
-python -m http.server 8000
+## Configuração de variáveis no Cloudflare (backend)
+Defina no Worker/Pages:
+- `MERCADO_PAGO_ACCESS_TOKEN`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_API_KEY`
+- `RIFAS_JSON` (opcional, JSON com rifas)
+
+Exemplo de `RIFAS_JSON`:
+```json
+[{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}]
 ```
 
-Depois acesse `http://localhost:8000`.
+## Desenvolvimento local
+```bash
+npm install
+cp config.example.js config.js
+npm run typecheck
+```
+
+Para subir API local do Worker:
+```bash
+npm run dev
+```
+
+## Deploy Cloudflare
+### Worker
+```bash
+npm run deploy
+```
+
+### Pages Functions
+No projeto Pages, mantenha a pasta `functions/` e configure as mesmas variáveis de ambiente. O handler Hono em `functions/[[path]].ts` publica os mesmos endpoints `/api/*`.

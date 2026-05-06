@@ -1,0 +1,6 @@
+name = "rifa-api"
+main = "src/worker.ts"
+compatibility_date = "2026-05-06"
+
+[vars]
+RIFAS_JSON = '[{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}]'

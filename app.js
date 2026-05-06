@@ -1,9 +1,17 @@
 (() => {
   const config = window.RIFA_CONFIG || {};
-  const ticketPrice = Number(config.TICKET_PRICE || 10);
-  const totalNumbers = Number(config.TOTAL_NUMBERS || 100);
+  const apiBaseUrl = String(config.API_BASE_URL || '/api').replace(/\/$/, '');
   const notificationChannel = String(config.NOTIFICATION_CHANNEL || 'email_sms');
+  const fallbackTicketPrice = Number(config.TICKET_PRICE || 10);
+  const fallbackTotalNumbers = Number(config.TOTAL_NUMBERS || 100);
   const selectedNumbers = new Set();
+
+  let raffle = {
+    id: String(config.RAFFLE_ID || 'rifa-principal'),
+    name: 'Rifa principal',
+    ticketPrice: fallbackTicketPrice,
+    totalNumbers: fallbackTotalNumbers
+  };
 
   const refs = {
     grid: document.getElementById('numbersGrid'),
@@ -19,27 +27,6 @@
   };
 
   let pendingPurchase = null;
-
-  refs.totalNumbers.textContent = String(totalNumbers);
-  refs.ticketPrice.textContent = toBRL(ticketPrice);
-
-  for (let i = 1; i <= totalNumbers; i += 1) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'number-btn';
-    button.textContent = String(i).padStart(2, '0');
-    button.addEventListener('click', () => {
-      if (selectedNumbers.has(i)) {
-        selectedNumbers.delete(i);
-        button.classList.remove('selected');
-      } else {
-        selectedNumbers.add(i);
-        button.classList.add('selected');
-      }
-      renderSummary();
-    });
-    refs.grid.appendChild(button);
-  }
 
   refs.cpf.addEventListener('input', (event) => {
     event.target.value = maskCPF(event.target.value);
@@ -57,8 +44,8 @@
       return;
     }
 
-    if (!config.MERCADO_PAGO_PUBLIC_KEY || !config.BACKEND_BASE_URL) {
-      setStatus('Configure MERCADO_PAGO_PUBLIC_KEY e BACKEND_BASE_URL no arquivo de configuração.', 'danger');
+    if (!config.MERCADO_PAGO_PUBLIC_KEY) {
+      setStatus('Configure MERCADO_PAGO_PUBLIC_KEY no arquivo de configuração.', 'danger');
       return;
     }
 
@@ -71,6 +58,7 @@
     }
 
     const payload = {
+      raffleId: raffle.id,
       buyer: {
         name: String(formData.get('name')).trim(),
         cpf: cpfDigits,
@@ -78,14 +66,14 @@
         phone: String(formData.get('phone')).trim()
       },
       numbers: [...selectedNumbers].sort((a, b) => a - b),
-      ticketPrice,
-      totalAmount: selectedNumbers.size * ticketPrice
+      ticketPrice: raffle.ticketPrice,
+      totalAmount: selectedNumbers.size * raffle.ticketPrice
     };
 
     refs.payButton.disabled = true;
 
     try {
-      const preferenceResponse = await fetch(`${config.BACKEND_BASE_URL}/create-preference`, {
+      const preferenceResponse = await fetch(`${apiBaseUrl}/pagamentos/preferencia`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -129,7 +117,7 @@
 
     try {
       const statusResponse = await fetch(
-        `${config.BACKEND_BASE_URL}/payment-status?preferenceId=${encodeURIComponent(pendingPurchase.preferenceId)}`
+        `${apiBaseUrl}/pagamentos/status?preferenceId=${encodeURIComponent(pendingPurchase.preferenceId)}`
       );
 
       if (!statusResponse.ok) {
@@ -147,7 +135,7 @@
         return;
       }
 
-      await savePurchaseToFirebase({
+      await sendConfirmationToApi({
         ...pendingPurchase,
         paymentId: payment.paymentId || null,
         paymentStatus: payment.status,
@@ -158,7 +146,7 @@
         }
       });
 
-      setStatus('Pagamento aprovado! Compra registrada no Firebase para envio de confirmação por e-mail/SMS.', 'success');
+      setStatus('Pagamento aprovado! Compra registrada para disparo de confirmação por e-mail/SMS.', 'success');
       resetFlow();
     } catch (error) {
       setStatus(error.message || 'Erro ao confirmar pagamento.', 'danger');
@@ -167,10 +155,54 @@
     }
   });
 
+  async function loadRaffle() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/rifas`);
+      if (!response.ok) {
+        throw new Error('Falha ao carregar rifas.');
+      }
+
+      const { rifas } = await response.json();
+      if (Array.isArray(rifas) && rifas.length > 0) {
+        raffle = rifas.find((item) => item.id === raffle.id) || rifas[0];
+      }
+    } catch (error) {
+      setStatus('Usando configuração local de rifa, API de rifas indisponível no momento.', 'warning');
+    }
+
+    refs.totalNumbers.textContent = String(raffle.totalNumbers);
+    refs.ticketPrice.textContent = toBRL(raffle.ticketPrice);
+    renderNumbersGrid();
+    renderSummary();
+  }
+
+  function renderNumbersGrid() {
+    refs.grid.innerHTML = '';
+    selectedNumbers.clear();
+
+    for (let i = 1; i <= raffle.totalNumbers; i += 1) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'number-btn';
+      button.textContent = String(i).padStart(2, '0');
+      button.addEventListener('click', () => {
+        if (selectedNumbers.has(i)) {
+          selectedNumbers.delete(i);
+          button.classList.remove('selected');
+        } else {
+          selectedNumbers.add(i);
+          button.classList.add('selected');
+        }
+        renderSummary();
+      });
+      refs.grid.appendChild(button);
+    }
+  }
+
   function renderSummary() {
     const numbers = [...selectedNumbers].sort((a, b) => a - b);
     refs.selectedNumbers.textContent = numbers.length ? numbers.map((n) => String(n).padStart(2, '0')).join(', ') : 'Nenhum';
-    refs.totalAmount.textContent = toBRL(numbers.length * ticketPrice);
+    refs.totalAmount.textContent = toBRL(numbers.length * raffle.ticketPrice);
   }
 
   function resetFlow() {
@@ -186,26 +218,16 @@
     renderSummary();
   }
 
-  async function savePurchaseToFirebase(data) {
-    if (
-      !window.firebase ||
-      typeof firebase.initializeApp !== 'function' ||
-      !config.FIREBASE_CONFIG ||
-      !config.FIREBASE_CONFIG.projectId
-    ) {
-      throw new Error('Firebase não configurado. Defina FIREBASE_CONFIG antes de usar.');
-    }
+  async function sendConfirmationToApi(data) {
+    const response = await fetch(`${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacao`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
 
-    if (!Array.isArray(firebase.apps) || !firebase.apps.length) {
-      try {
-        firebase.initializeApp(config.FIREBASE_CONFIG);
-      } catch (firebaseInitError) {
-        throw new Error('Falha ao inicializar Firebase. Verifique as configurações no arquivo de configuração.');
-      }
+    if (!response.ok) {
+      throw new Error('Não foi possível registrar a confirmação da compra na API da rifa.');
     }
-
-    const db = firebase.firestore();
-    await db.collection('rifaPurchases').add(data);
   }
 
   function setStatus(message, type) {
@@ -261,5 +283,5 @@
     }).format(Number(value));
   }
 
-  renderSummary();
+  loadRaffle();
 })();

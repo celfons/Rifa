@@ -1,0 +1,4 @@
+node_modules/
+.wrangler/
+config.js
+*.png
