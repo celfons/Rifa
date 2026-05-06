@@ -140,11 +140,26 @@ async function saveInFirebase(env: Bindings, raffleId: string, payload: unknown)
   );
   url.searchParams.set('key', env.FIREBASE_API_KEY);
 
+  const purchase = normalizePurchasePayload(payload);
+
   const body = {
     fields: {
       raffleId: { stringValue: raffleId },
-      payloadJson: { stringValue: JSON.stringify(payload) },
-      createdAt: { timestampValue: new Date().toISOString() }
+      buyerName: { stringValue: purchase.buyerName },
+      buyerCpf: { stringValue: purchase.buyerCpf },
+      buyerEmail: { stringValue: purchase.buyerEmail },
+      buyerPhone: { stringValue: purchase.buyerPhone },
+      numbersCsv: { stringValue: purchase.numbersCsv },
+      numbersCount: { integerValue: String(purchase.numbersCount) },
+      ticketPrice: { doubleValue: purchase.ticketPrice },
+      totalAmount: { doubleValue: purchase.totalAmount },
+      preferenceId: { stringValue: purchase.preferenceId },
+      paymentId: { stringValue: purchase.paymentId },
+      paymentStatus: { stringValue: purchase.paymentStatus },
+      notificationChannel: { stringValue: purchase.notificationChannel },
+      notificationStatus: { stringValue: purchase.notificationStatus },
+      createdAt: { timestampValue: purchase.createdAt },
+      rawPayloadJson: { stringValue: JSON.stringify(payload) }
     }
   };
 
@@ -159,6 +174,31 @@ async function saveInFirebase(env: Bindings, raffleId: string, payload: unknown)
   }
 
   return { ok: true as const };
+}
+
+function normalizePurchasePayload(payload: unknown) {
+  const data = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+  const buyer = (data.buyer && typeof data.buyer === 'object' ? data.buyer : {}) as Record<string, unknown>;
+  const notification =
+    data.notification && typeof data.notification === 'object' ? (data.notification as Record<string, unknown>) : {};
+  const numbers = Array.isArray(data.numbers) ? data.numbers.map((value) => String(value)) : [];
+
+  return {
+    buyerName: String(buyer.name || ''),
+    buyerCpf: String(buyer.cpf || ''),
+    buyerEmail: String(buyer.email || ''),
+    buyerPhone: String(buyer.phone || ''),
+    numbersCsv: numbers.join(','),
+    numbersCount: numbers.length,
+    ticketPrice: Number(data.ticketPrice || 0),
+    totalAmount: Number(data.totalAmount || 0),
+    preferenceId: String(data.preferenceId || ''),
+    paymentId: String(data.paymentId || ''),
+    paymentStatus: String(data.paymentStatus || ''),
+    notificationChannel: String(notification.channel || ''),
+    notificationStatus: String(notification.status || ''),
+    createdAt: String(data.createdAt || new Date().toISOString())
+  };
 }
 
 function parseRifas(value?: string): Rifa[] {
