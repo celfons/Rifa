@@ -1,6 +1,7 @@
 window.RIFA_CONFIG = {
   TICKET_PRICE: 10,
   TOTAL_NUMBERS: 100,
+  NOTIFICATION_CHANNEL: 'email_sms',
   MERCADO_PAGO_PUBLIC_KEY: 'SUA_PUBLIC_KEY_AQUI',
   BACKEND_BASE_URL: 'https://seu-backend.exemplo.com',
   FIREBASE_CONFIG: {

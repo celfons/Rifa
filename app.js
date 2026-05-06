@@ -2,6 +2,7 @@
   const config = window.RIFA_CONFIG || {};
   const ticketPrice = Number(config.TICKET_PRICE || 10);
   const totalNumbers = Number(config.TOTAL_NUMBERS || 100);
+  const notificationChannel = String(config.NOTIFICATION_CHANNEL || 'email_sms');
   const selectedNumbers = new Set();
 
   const refs = {
@@ -104,7 +105,7 @@
       try {
         mercadoPago = new MercadoPago(config.MERCADO_PAGO_PUBLIC_KEY, { locale: 'pt-BR' });
       } catch (sdkError) {
-        throw new Error('Falha ao inicializar Mercado Pago SDK. Verifique se o script foi carregado e se a chave pública está válida.');
+        throw new Error('Falha ao inicializar Mercado Pago SDK. Verifique se o script foi carregado corretamente.');
       }
       mercadoPago.checkout({ preference: { id: preferenceId }, autoOpen: true });
 
@@ -152,7 +153,7 @@
         paymentStatus: payment.status,
         createdAt: new Date().toISOString(),
         notification: {
-          channel: 'email_sms',
+          channel: notificationChannel,
           status: 'pending'
         }
       });
