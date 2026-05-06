@@ -1,5 +1,5 @@
 name = "rifa-api"
-pages_build_output_dir = "."
+main = "src/worker.ts"
 compatibility_date = "2026-05-06"
 
 [vars]
