@@ -1,0 +1,41 @@
+:root {
+  --hero-bg: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 60%, #084298 100%);
+}
+
+body {
+  background-color: #f7f9fc;
+}
+
+.hero {
+  background: var(--hero-bg);
+  color: #fff;
+}
+
+.numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 0.5rem;
+  max-height: 560px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.number-btn {
+  border: 1px solid #d6d9de;
+  border-radius: 10px;
+  background: #fff;
+  color: #2b2f33;
+  font-weight: 600;
+  min-height: 44px;
+}
+
+.number-btn:hover {
+  border-color: #0d6efd;
+  color: #0d6efd;
+}
+
+.number-btn.selected {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
