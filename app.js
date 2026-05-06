@@ -97,7 +97,7 @@
       try {
         mercadoPago = new MercadoPago(config.MERCADO_PAGO_PUBLIC_KEY, { locale: 'pt-BR' });
       } catch (sdkError) {
-        throw new Error('Falha ao inicializar Mercado Pago SDK. Verifique a chave pública configurada.');
+        throw new Error('Falha ao inicializar Mercado Pago SDK. Verifique se o script foi carregado e se a chave pública está válida.');
       }
       mercadoPago.checkout({ preference: { id: preferenceId }, autoOpen: true });
 
@@ -131,7 +131,11 @@
       const payment = await statusResponse.json();
 
       if (payment.status !== 'approved') {
-        setStatus('Pagamento ainda não aprovado. Tente novamente em alguns instantes.', 'warning');
+        if (payment.status === 'pending' || payment.status === 'in_process') {
+          setStatus('Pagamento em processamento. Aguarde alguns instantes e confirme novamente.', 'warning');
+        } else {
+          setStatus(`Pagamento não aprovado (status: ${payment.status}). Verifique no Mercado Pago e tente outra forma de pagamento.`, 'danger');
+        }
         return;
       }
 
