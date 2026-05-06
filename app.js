@@ -203,15 +203,26 @@
 
   function maskCPF(value) {
     const digits = cleanDigits(value).slice(0, 11);
+    let masked = digits;
 
-    return digits
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    if (digits.length > 3) {
+      masked = `${digits.slice(0, 3)}.${digits.slice(3)}`;
+    }
+    if (digits.length > 6) {
+      masked = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+    }
+    if (digits.length > 9) {
+      masked = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    }
+
+    return masked;
   }
 
   function toBRL(value) {
-    return Number(value).toFixed(2).replace('.', ',');
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(Number(value));
   }
 
   renderSummary();
