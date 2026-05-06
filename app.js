@@ -93,7 +93,12 @@
         throw new Error('Resposta inválida do backend (preferenceId ausente).');
       }
 
-      const mercadoPago = new MercadoPago(config.MERCADO_PAGO_PUBLIC_KEY, { locale: 'pt-BR' });
+      let mercadoPago;
+      try {
+        mercadoPago = new MercadoPago(config.MERCADO_PAGO_PUBLIC_KEY, { locale: 'pt-BR' });
+      } catch (sdkError) {
+        throw new Error('Falha ao inicializar Mercado Pago SDK. Verifique a chave pública configurada.');
+      }
       mercadoPago.checkout({ preference: { id: preferenceId }, autoOpen: true });
 
       pendingPurchase = { ...payload, preferenceId };
@@ -175,7 +180,11 @@
     }
 
     if (!firebase.apps.length) {
-      firebase.initializeApp(config.FIREBASE_CONFIG);
+      try {
+        firebase.initializeApp(config.FIREBASE_CONFIG);
+      } catch (firebaseInitError) {
+        throw new Error('Falha ao inicializar Firebase. Verifique as configurações no arquivo de configuração.');
+      }
     }
 
     const db = firebase.firestore();

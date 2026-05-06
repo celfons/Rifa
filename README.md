@@ -10,13 +10,13 @@ Site simples e responsivo de rifa com Bootstrap, JavaScript, SDK client do Merca
 - Registro da compra no Firestore (`rifaPurchases`) para disparo posterior de e-mail/SMS via trigger no Firebase
 
 ## Arquivos principais
-- `/home/runner/work/Rifa/Rifa/index.html`
-- `/home/runner/work/Rifa/Rifa/styles.css`
-- `/home/runner/work/Rifa/Rifa/app.js`
-- `/home/runner/work/Rifa/Rifa/config.example.js`
+- `index.html`
+- `styles.css`
+- `app.js`
+- `config.example.js`
 
 ## Configuração
-1. Edite `config.example.js` com suas chaves reais (ou renomeie para `config.js` e ajuste o import no `index.html`).
+1. Copie `config.example.js` para `config.js` e preencha com suas chaves reais.
 2. Configure no backend os endpoints:
    - `POST /create-preference` → retorna `{ "preferenceId": "..." }`
    - `GET /payment-status?preferenceId=...` → retorna `{ "status": "approved", "paymentId": "..." }`
@@ -26,7 +26,7 @@ Site simples e responsivo de rifa com Bootstrap, JavaScript, SDK client do Merca
 Abra um servidor estático na raiz do projeto, por exemplo:
 
 ```bash
-cd /home/runner/work/Rifa/Rifa
+cp config.example.js config.js
 python -m http.server 8000
 ```
 
