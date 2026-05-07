@@ -309,14 +309,17 @@ async function listPurchasedNumbersFromD1(env: Bindings, raffleId: string) {
     return { ok: false, error: 'Falha ao buscar números comprados no D1.' as const };
   }
 
-  const numbersSet = new Set<string>();
+  const numbersSet = new Set<number>();
   result.results.forEach((row) => {
     parseNumbersCsv(row.numbers_csv || '').forEach((value) => {
-      numbersSet.add(value);
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        numbersSet.add(parsed);
+      }
     });
   });
 
-  const numbers = Array.from(numbersSet).sort((a, b) => Number(a) - Number(b));
+  const numbers = Array.from(numbersSet).sort((a, b) => a - b);
   return { ok: true as const, numbers };
 }
 

@@ -364,15 +364,23 @@
       }
     } catch (error) {
       console.warn('Não foi possível carregar números comprados.', error);
+      if (refs.statusMessage.classList.contains('d-none')) {
+        setStatus(
+          'Não foi possível carregar números comprados. Alguns números podem aparecer como disponíveis.',
+          'warning'
+        );
+      }
     }
   }
 
   function addPurchasedNumber(value) {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
+      console.warn('Número comprado inválido recebido:', value);
       return;
     }
     if (Number.isFinite(raffle.totalNumbers) && parsed > raffle.totalNumbers) {
+      console.warn('Número comprado fora do intervalo da rifa:', value);
       return;
     }
     purchasedNumbers.add(parsed);
