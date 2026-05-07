@@ -1,3 +1,3 @@
-import app from './hono-app';
+import { Hono } from "hono";
 
 export default app;
