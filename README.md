@@ -4,7 +4,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 
 ## Funcionalidades
 - Seleção visual de números da rifa
-- Formulário com nome, CPF, telefone e e-mail
+- Formulário com nome e telefone
 - Pagamento com SDK client do Mercado Pago
 - APIs da rifa publicadas no backend Hono
 - Registro pós-confirmação no Cloudflare D1 via API backend
@@ -21,6 +21,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `GET /api/pagamentos/status?preferenceId=...` → consulta status de pagamento
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
 - `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
+- `GET /api/rifas/:id/numeros-comprados` → lista números comprados da rifa
 
 ## Configuração do front-end
 1. Copie `public/config.example.js` para `public/config.js`.

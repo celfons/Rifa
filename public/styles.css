@@ -39,3 +39,15 @@ body {
   border-color: #0d6efd;
   color: #fff;
 }
+
+.number-btn.sold {
+  background: #e9ecef;
+  border-color: #d6d9de;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.number-btn.sold:hover {
+  border-color: #d6d9de;
+  color: #6c757d;
+}

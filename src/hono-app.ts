@@ -34,6 +34,10 @@ type PurchaseRow = {
   raw_payload_json: string;
 };
 
+type PurchasedNumbersRow = {
+  numbers_csv: string;
+};
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 const defaultRifas: Rifa[] = [
@@ -173,6 +177,18 @@ app.get('/api/rifas/:id/confirmacoes', async (c) => {
   return c.json({ purchases: listResult.purchases });
 });
 
+app.get('/api/rifas/:id/numeros-comprados', async (c) => {
+  const raffleId = c.req.param('id');
+
+  const listResult = await listPurchasedNumbersFromD1(c.env, raffleId);
+
+  if (!listResult.ok) {
+    return c.json({ error: listResult.error }, 502);
+  }
+
+  return c.json({ numbers: listResult.numbers });
+});
+
 app.get('/health', (c) => c.json({ ok: true }));
 
 const DEFAULT_CONFIRMATIONS_LIMIT = 100;
@@ -275,6 +291,38 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
   return { ok: true as const, purchases };
 }
 
+async function listPurchasedNumbersFromD1(env: Bindings, raffleId: string) {
+  if (!env.DB) {
+    return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
+  }
+
+  const statement = env.DB.prepare(
+    `SELECT
+      numbers_csv
+    FROM rifa_purchases
+    WHERE raffle_id = ?`
+  );
+
+  const result = await statement.bind(raffleId).all<PurchasedNumbersRow>();
+
+  if (!result.success) {
+    return { ok: false, error: 'Falha ao buscar números comprados no D1.' as const };
+  }
+
+  const numbersSet = new Set<number>();
+  result.results.forEach((row) => {
+    parseNumbersCsv(row.numbers_csv || '').forEach((value) => {
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        numbersSet.add(parsed);
+      }
+    });
+  });
+
+  const numbers = Array.from(numbersSet).sort((a, b) => a - b);
+  return { ok: true as const, numbers };
+}
+
 function mapPurchaseRow(row: PurchaseRow) {
   const numbersCsv = row.numbers_csv || '';
   const numbers = parseNumbersCsv(numbersCsv);
@@ -335,8 +383,8 @@ function normalizePurchasePayload(payload: unknown) {
     preferenceId: String(data.preferenceId || ''),
     paymentId: String(data.paymentId || ''),
     paymentStatus: String(data.paymentStatus || ''),
-    notificationChannel: String(notification.channel || ''),
-    notificationStatus: String(notification.status || ''),
+    notificationChannel: String(notification.channel || 'none'),
+    notificationStatus: String(notification.status || 'skipped'),
     createdAt: String(data.createdAt || new Date().toISOString())
   };
 }
