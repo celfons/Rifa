@@ -265,12 +265,7 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
 
 function mapPurchaseRow(row: PurchaseRow) {
   const numbersCsv = row.numbers_csv || '';
-  const numbers = numbersCsv.length
-    ? numbersCsv
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-    : [];
+  const numbers = parseNumbersCsv(numbersCsv);
 
   return {
     id: row.id,
@@ -296,6 +291,17 @@ function mapPurchaseRow(row: PurchaseRow) {
     insertedAt: row.inserted_at || '',
     rawPayloadJson: row.raw_payload_json || ''
   };
+}
+
+function parseNumbersCsv(value: string) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizePurchasePayload(payload: unknown) {
@@ -329,11 +335,11 @@ function parseConfirmationsLimit(value?: string) {
   }
 
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
+  if (!Number.isFinite(parsed) || parsed < 1) {
     return DEFAULT_CONFIRMATIONS_LIMIT;
   }
 
-  const limit = Math.min(Math.max(Math.floor(parsed), 1), MAX_CONFIRMATIONS_LIMIT);
+  const limit = Math.min(Math.floor(parsed), MAX_CONFIRMATIONS_LIMIT);
   return limit;
 }
 

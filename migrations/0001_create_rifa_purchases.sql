@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS rifa_purchases (
   inserted_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_rifa_purchases_raffle ON rifa_purchases (raffle_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rifa_purchases_raffle ON rifa_purchases (raffle_id, created_at DESC);
