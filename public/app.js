@@ -148,7 +148,7 @@
 
       pendingPurchase.numbers.forEach((number) => addPurchasedNumber(number));
       updateNumbersGridAvailability();
-      setStatus('Pagamento aprovado! Compra registrada sem envio de confirmação por SMS ou e-mail.', 'success');
+      setStatus('Pagamento aprovado!', 'success');
       resetFlow();
     } catch (error) {
       setStatus(error.message || 'Erro ao confirmar pagamento.', 'danger');
