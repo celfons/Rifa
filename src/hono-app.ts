@@ -265,10 +265,12 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
 
 function mapPurchaseRow(row: PurchaseRow) {
   const numbersCsv = row.numbers_csv || '';
-  const numbers = numbersCsv
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const numbers = numbersCsv.length
+    ? numbersCsv
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
 
   return {
     id: row.id,
@@ -331,7 +333,7 @@ function parseConfirmationsLimit(value?: string) {
     return DEFAULT_CONFIRMATIONS_LIMIT;
   }
 
-  const limit = Math.min(Math.max(Math.trunc(parsed), 1), MAX_CONFIRMATIONS_LIMIT);
+  const limit = Math.min(Math.max(Math.floor(parsed), 1), MAX_CONFIRMATIONS_LIMIT);
   return limit;
 }
 
