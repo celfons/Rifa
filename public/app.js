@@ -6,7 +6,7 @@
   const selectedNumbers = new Set();
   const soldNumbers = new Set();
   const pendingPurchaseStorageKey = 'rifa_pending_purchase';
-  const purchasedNumbersLimit = 500;
+  const maxConfirmationsLimit = 500;
 
   let raffle = {
     id: String(config.RAFFLE_ID || 'rifa'),
@@ -327,7 +327,7 @@
     refs.form.reset();
     selectedNumbers.clear();
     refs.confirmButton.classList.add('d-none');
-    renderNumbersGrid();
+    updateNumbersGridAvailability();
     renderSummary();
   }
 
@@ -352,8 +352,12 @@
   async function loadPurchasedNumbers() {
     soldNumbers.clear();
     try {
+      const limit =
+        Number.isFinite(raffle.totalNumbers) && raffle.totalNumbers > 0
+          ? Math.min(raffle.totalNumbers, maxConfirmationsLimit)
+          : maxConfirmationsLimit;
       const response = await fetch(
-        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${purchasedNumbersLimit}`
+        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${limit}`
       );
       if (!response.ok) {
         throw new Error('Falha ao carregar números comprados.');
@@ -373,10 +377,30 @@
 
   function addSoldNumber(value) {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return;
+    }
+    if (Number.isFinite(raffle.totalNumbers) && parsed > raffle.totalNumbers) {
       return;
     }
     soldNumbers.add(parsed);
+  }
+
+  function updateNumbersGridAvailability() {
+    const buttons = refs.grid.querySelectorAll('.number-btn');
+    buttons.forEach((button, index) => {
+      const number = index + 1;
+      button.classList.remove('selected');
+      if (soldNumbers.has(number)) {
+        button.disabled = true;
+        button.classList.add('sold');
+        button.setAttribute('aria-disabled', 'true');
+      } else {
+        button.disabled = false;
+        button.classList.remove('sold');
+        button.removeAttribute('aria-disabled');
+      }
+    });
   }
 
   function toBRL(value) {
