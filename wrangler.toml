@@ -1,4 +1,4 @@
-name = "rifa-api"
+name = "rifa"
 main = "src/worker.ts"
 compatibility_date = "2026-05-06"
 
