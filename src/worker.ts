@@ -18,6 +18,6 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    return new Response('Static assets binding (ASSETS) não configurado.', { status: 500 });
+    return new Response('Static assets binding (ASSETS) is not configured.', { status: 500 });
   }
 };
