@@ -7,7 +7,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - Formulário com nome, CPF, telefone e e-mail
 - Pagamento com SDK client do Mercado Pago
 - APIs da rifa publicadas no backend Hono
-- Registro pós-confirmação no Firebase (Firestore) via API backend
+- Registro pós-confirmação no Cloudflare D1 via API backend
 
 ## Estrutura
 - Front-end: `public/index.html`, `public/styles.css`, `public/app.js`, `public/config.example.js`
@@ -19,7 +19,8 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `GET /api/rifas` → lista rifas disponíveis
 - `POST /api/pagamentos/preferencia` → cria preferência no Mercado Pago
 - `GET /api/pagamentos/status?preferenceId=...` → consulta status de pagamento
-- `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no Firestore
+- `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
+- `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
 
 ## Configuração do front-end
 1. Copie `public/config.example.js` para `public/config.js`.
@@ -31,9 +32,9 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 ## Configuração de variáveis no Cloudflare (backend)
 Defina no Worker/Pages:
 - `MERCADO_PAGO_ACCESS_TOKEN`
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_API_KEY`
 - `RIFAS_JSON` (opcional, JSON com rifas)
+
+Configure o binding do D1 com o nome `DB` no `wrangler.toml` e no painel da Cloudflare (Workers ou Pages). Substitua o `database_id` pelo ID real do seu banco D1.
 
 Exemplo de `RIFAS_JSON`:
 ```json
@@ -45,6 +46,11 @@ Exemplo de `RIFAS_JSON`:
 npm install
 cp public/config.example.js public/config.js
 npm run typecheck
+```
+
+Para criar o schema do D1 local, use as migrations em `migrations/`:
+```bash
+wrangler d1 migrations apply rifa-db --local
 ```
 
 Para subir API local do Worker:

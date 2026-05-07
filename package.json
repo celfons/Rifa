@@ -1,7 +1,7 @@
 {
   "name": "rifa",
   "version": "1.0.0",
-  "description": "Site simples e responsivo de rifa com Bootstrap, JavaScript, SDK client do Mercado Pago e registro de compras no Firebase.",
+  "description": "Site simples e responsivo de rifa com Bootstrap, JavaScript, SDK client do Mercado Pago e registro de compras no Cloudflare D1.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "dev": "wrangler dev",
