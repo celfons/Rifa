@@ -1,5 +1,5 @@
 name = "rifa-api"
-main = "src/worker.ts"
+main = "src/hono-app.ts"
 compatibility_date = "2026-05-06"
 
 [vars]
