@@ -5,6 +5,7 @@
   const fallbackTicketPrice = Number(config.TICKET_PRICE || 10);
   const fallbackTotalNumbers = Number(config.TOTAL_NUMBERS || 100);
   const selectedNumbers = new Set();
+  const pendingPurchaseStorageKey = 'rifa_pending_purchase';
 
   let raffle = {
     id: String(config.RAFFLE_ID || 'rifa'),
@@ -98,6 +99,7 @@
       mercadoPago.checkout({ preference: { id: preferenceId }, autoOpen: true });
 
       pendingPurchase = { ...payload, preferenceId };
+      savePendingPurchase(pendingPurchase);
       refs.confirmButton.classList.remove('d-none');
       setStatus('Pagamento iniciado. Após concluir no Mercado Pago, clique em "Já paguei, confirmar pagamento".', 'info');
     } catch (error) {
@@ -107,9 +109,18 @@
     }
   });
 
-  refs.confirmButton.addEventListener('click', async () => {
+  refs.confirmButton.addEventListener('click', () => {
+    void confirmPendingPurchase();
+  });
+
+  async function confirmPendingPurchase({ auto = false } = {}) {
     if (!pendingPurchase) {
       setStatus('Inicie o pagamento primeiro.', 'warning');
+      return;
+    }
+
+    if (!pendingPurchase.preferenceId) {
+      setStatus('Preferência de pagamento ausente. Inicie o pagamento novamente.', 'danger');
       return;
     }
 
@@ -130,7 +141,10 @@
         if (payment.status === 'pending' || payment.status === 'in_process') {
           setStatus('Pagamento em processamento. Aguarde alguns instantes e confirme novamente.', 'warning');
         } else {
-          setStatus(`Pagamento não aprovado (status: ${payment.status}). Verifique no Mercado Pago e tente outra forma de pagamento.`, 'danger');
+          setStatus(
+            `Pagamento não aprovado (status: ${payment.status}). Verifique no Mercado Pago e tente outra forma de pagamento.`,
+            'danger'
+          );
         }
         return;
       }
@@ -153,7 +167,105 @@
     } finally {
       refs.confirmButton.disabled = false;
     }
-  });
+  }
+
+  function savePendingPurchase(purchase) {
+    try {
+      localStorage.setItem(pendingPurchaseStorageKey, JSON.stringify(purchase));
+    } catch (error) {
+      console.warn('Não foi possível salvar o pagamento pendente no navegador.', error);
+    }
+  }
+
+  function readPendingPurchaseFromStorage() {
+    try {
+      const raw = localStorage.getItem(pendingPurchaseStorageKey);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      return parsed;
+    } catch (error) {
+      console.warn('Não foi possível ler o pagamento pendente no navegador.', error);
+      return null;
+    }
+  }
+
+  function restorePendingPurchaseFromStorage({ showMessage = true } = {}) {
+    const stored = readPendingPurchaseFromStorage();
+    if (!stored) {
+      return null;
+    }
+
+    pendingPurchase = stored;
+    refs.confirmButton.classList.remove('d-none');
+
+    if (showMessage) {
+      setStatus('Encontramos um pagamento pendente. Confirme para concluir a compra.', 'info');
+    }
+
+    return stored;
+  }
+
+  function clearPendingPurchaseFromStorage() {
+    try {
+      localStorage.removeItem(pendingPurchaseStorageKey);
+    } catch (error) {
+      console.warn('Não foi possível limpar o pagamento pendente no navegador.', error);
+    }
+  }
+
+  function getPaymentReturnInfo() {
+    const params = new URLSearchParams(window.location.search);
+    const preferenceId = params.get('preference_id') || params.get('preferenceId');
+    const paymentId = params.get('payment_id') || params.get('collection_id');
+    const status = params.get('status') || params.get('collection_status');
+    const hasReturn = Boolean(preferenceId || paymentId || status);
+
+    return {
+      hasReturn,
+      preferenceId,
+      paymentId,
+      status
+    };
+  }
+
+  function clearReturnParams() {
+    if (!window.location.search) {
+      return;
+    }
+
+    const newUrl = `${window.location.pathname}${window.location.hash || ''}`;
+    window.history.replaceState({}, document.title, newUrl);
+  }
+
+  async function handlePaymentReturn(returnInfo) {
+    if (!returnInfo?.hasReturn) {
+      return;
+    }
+
+    clearReturnParams();
+
+    if (!pendingPurchase) {
+      setStatus(
+        'Pagamento concluído no Mercado Pago, mas não foi possível recuperar os dados da compra. Inicie novamente ou entre em contato.',
+        'warning'
+      );
+      return;
+    }
+
+    if (returnInfo.preferenceId && pendingPurchase.preferenceId !== returnInfo.preferenceId) {
+      pendingPurchase = { ...pendingPurchase, preferenceId: returnInfo.preferenceId };
+      savePendingPurchase(pendingPurchase);
+    }
+
+    refs.confirmButton.classList.remove('d-none');
+    setStatus('Pagamento retornou do Mercado Pago. Confirmando automaticamente...', 'info');
+    await confirmPendingPurchase({ auto: true });
+  }
 
   async function loadRaffle() {
     try {
@@ -207,6 +319,7 @@
 
   function resetFlow() {
     pendingPurchase = null;
+    clearPendingPurchaseFromStorage();
     refs.form.reset();
     selectedNumbers.clear();
     refs.confirmButton.classList.add('d-none');
@@ -283,5 +396,12 @@
     }).format(Number(value));
   }
 
-  loadRaffle();
+  async function init() {
+    await loadRaffle();
+    const returnInfo = getPaymentReturnInfo();
+    restorePendingPurchaseFromStorage({ showMessage: !returnInfo.hasReturn });
+    await handlePaymentReturn(returnInfo);
+  }
+
+  void init();
 })();
