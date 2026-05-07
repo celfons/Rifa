@@ -170,7 +170,7 @@
       setStatus('Usando configuração local de rifa, API de rifas indisponível no momento.', 'warning');
     }
 
-    refs.totalNumbers.textContent = String("1000");
+    refs.totalNumbers.textContent = "1000";
     refs.ticketPrice.textContent = toBRL(10);
     renderNumbersGrid();
     renderSummary();
