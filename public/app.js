@@ -147,6 +147,7 @@
       });
 
       pendingPurchase.numbers.forEach((number) => addPurchasedNumber(number));
+      updateNumbersGridAvailability();
       setStatus('Pagamento aprovado! Compra registrada sem envio de confirmação por SMS ou e-mail.', 'success');
       resetFlow();
     } catch (error) {
@@ -327,7 +328,6 @@
     refs.form.reset();
     selectedNumbers.clear();
     refs.confirmButton.classList.add('d-none');
-    updateNumbersGridAvailability();
     renderSummary();
   }
 
@@ -364,12 +364,10 @@
       }
     } catch (error) {
       console.warn('Não foi possível carregar números comprados.', error);
-      if (refs.statusMessage.classList.contains('d-none')) {
-        setStatus(
-          'Não foi possível carregar números comprados. Alguns números podem aparecer como disponíveis.',
-          'warning'
-        );
-      }
+      setStatus(
+        'Não foi possível carregar números comprados. Alguns números podem aparecer como disponíveis.',
+        'warning'
+      );
     }
   }
 
