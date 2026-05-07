@@ -32,14 +32,35 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 
 ## Configuração de variáveis no Cloudflare (backend)
 Defina no Worker/Pages:
-- `MERCADO_PAGO_ACCESS_TOKEN`
-- `RIFAS_JSON` (opcional, JSON com rifas)
+- `MERCADO_PAGO_ACCESS_TOKEN` (string ou JSON por tenant)
+- `RIFAS_JSON` (opcional, JSON com rifas; pode ser global ou por tenant)
+- `TENANT_ROOT_DOMAIN` (ex.: `example.com`, habilita multi-tenant por subdomínio)
+- `TENANT_DEFAULT_ID` (opcional, padrão: `default`)
+- `TENANT_MAP_JSON` (opcional, JSON `{ "subdominio": "tenant_id" }`)
+- `TENANT_IGNORED_SUBDOMAINS` (opcional, CSV; padrão: `www`)
+- `TENANT_ALLOW_HEADER_OVERRIDE` (opcional: `1` para aceitar header `x-rifa-tenant` em dev)
 
 Configure o binding do D1 com o nome `DB` no `wrangler.toml` e no painel da Cloudflare (Workers ou Pages). Informe o `database_id` do seu banco D1 no `wrangler.toml` (de preferência em um bloco de ambiente como `[env.production]`).
 
 Exemplo de `RIFAS_JSON`:
 ```json
 [{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}]
+```
+
+Exemplo de `RIFAS_JSON` por tenant (por subdomínio), usando `default` como fallback:
+```json
+{
+  "default": [{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}],
+  "cliente-a": [{"id":"rifa-a","nome":"Rifa Cliente A","preco":20,"totalNumeros":500}]
+}
+```
+
+Exemplo de `MERCADO_PAGO_ACCESS_TOKEN` por tenant:
+```json
+{
+  "default": "TOKEN_PADRAO",
+  "cliente-a": "TOKEN_DO_CLIENTE_A"
+}
 ```
 
 ## Desenvolvimento local

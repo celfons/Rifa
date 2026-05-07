@@ -4,6 +4,12 @@ type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
   RIFAS_JSON?: string;
   DB?: D1Database;
+  TENANT_ENABLED?: string;
+  TENANT_ROOT_DOMAIN?: string;
+  TENANT_DEFAULT_ID?: string;
+  TENANT_MAP_JSON?: string;
+  TENANT_IGNORED_SUBDOMAINS?: string;
+  TENANT_ALLOW_HEADER_OVERRIDE?: string;
 };
 
 type Rifa = {
@@ -36,7 +42,11 @@ type PurchasedNumbersRow = {
   numbers_csv: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  tenantId: string;
+};
+
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 const defaultRifas: Rifa[] = [
   {
@@ -47,8 +57,14 @@ const defaultRifas: Rifa[] = [
   }
 ];
 
+app.use('/api/*', async (c, next) => {
+  const tenantId = resolveTenantId(c);
+  c.set('tenantId', tenantId);
+  await next();
+});
+
 app.get('/api/rifas', (c) => {
-  const rifas = parseRifas(c.env.RIFAS_JSON);
+  const rifas = parseRifas(c.env.RIFAS_JSON, c.get('tenantId'));
 
   return c.json({
     rifas: rifas.map((rifa) => ({
@@ -61,7 +77,7 @@ app.get('/api/rifas', (c) => {
 });
 
 app.post('/api/pagamentos/preferencia', async (c) => {
-  const accessToken = c.env.MERCADO_PAGO_ACCESS_TOKEN;
+  const accessToken = resolveMercadoPagoAccessToken(c.env.MERCADO_PAGO_ACCESS_TOKEN, c.get('tenantId'));
   if (!accessToken) {
     return c.json({ error: 'MERCADO_PAGO_ACCESS_TOKEN não configurado.' }, 500);
   }
@@ -122,7 +138,7 @@ app.post('/api/pagamentos/preferencia', async (c) => {
 });
 
 app.get('/api/pagamentos/status', async (c) => {
-  const accessToken = c.env.MERCADO_PAGO_ACCESS_TOKEN;
+  const accessToken = resolveMercadoPagoAccessToken(c.env.MERCADO_PAGO_ACCESS_TOKEN, c.get('tenantId'));
   const preferenceId = c.req.query('preferenceId');
 
   if (!accessToken || !preferenceId) {
@@ -153,7 +169,7 @@ app.post('/api/rifas/:id/confirmacao', async (c) => {
   const raffleId = c.req.param('id');
   const payload = await c.req.json();
 
-  const saveResult = await saveInD1(c.env, raffleId, payload);
+  const saveResult = await saveInD1(c.env, c.get('tenantId'), raffleId, payload);
 
   if (!saveResult.ok) {
     return c.json({ error: saveResult.error }, 502);
@@ -166,7 +182,7 @@ app.get('/api/rifas/:id/confirmacoes', async (c) => {
   const raffleId = c.req.param('id');
   const limit = parseConfirmationsLimit(c.req.query('limit'));
 
-  const listResult = await listConfirmationsFromD1(c.env, raffleId, limit);
+  const listResult = await listConfirmationsFromD1(c.env, c.get('tenantId'), raffleId, limit);
 
   if (!listResult.ok) {
     return c.json({ error: listResult.error }, 502);
@@ -178,7 +194,7 @@ app.get('/api/rifas/:id/confirmacoes', async (c) => {
 app.get('/api/rifas/:id/numeros-comprados', async (c) => {
   const raffleId = c.req.param('id');
 
-  const listResult = await listPurchasedNumbersFromD1(c.env, raffleId);
+  const listResult = await listPurchasedNumbersFromD1(c.env, c.get('tenantId'), raffleId);
 
   if (!listResult.ok) {
     return c.json({ error: listResult.error }, 502);
@@ -192,7 +208,7 @@ app.get('/health', (c) => c.json({ ok: true }));
 const DEFAULT_CONFIRMATIONS_LIMIT = 100;
 const MAX_CONFIRMATIONS_LIMIT = 500;
 
-async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
+async function saveInD1(env: Bindings, tenantId: string, raffleId: string, payload: unknown) {
   if (!env.DB) {
     return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
   }
@@ -200,8 +216,11 @@ async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
   const purchase = normalizePurchasePayload(payload);
   const statement = env.DB.prepare(
     `INSERT INTO rifa_purchases (
+      tenant_id,
       raffle_id,
       buyer_name,
+      buyer_cpf,
+      buyer_email,
       buyer_phone,
       numbers_csv,
       numbers_count,
@@ -214,13 +233,16 @@ async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
       notification_status,
       created_at,
       raw_payload_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const result = await statement
     .bind(
+      tenantId,
       raffleId,
       purchase.buyerName,
+      purchase.buyerCpf,
+      purchase.buyerEmail,
       purchase.buyerPhone,
       purchase.numbersCsv,
       purchase.numbersCount,
@@ -243,7 +265,7 @@ async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
   return { ok: true as const };
 }
 
-async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: number) {
+async function listConfirmationsFromD1(env: Bindings, tenantId: string, raffleId: string, limit: number) {
   if (!env.DB) {
     return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
   }
@@ -267,12 +289,13 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
       inserted_at,
       raw_payload_json
     FROM rifa_purchases
-    WHERE raffle_id = ?
+    WHERE tenant_id = ?
+      AND raffle_id = ?
     ORDER BY created_at DESC
     LIMIT ?`
   );
 
-  const result = await statement.bind(raffleId, limit).all<PurchaseRow>();
+  const result = await statement.bind(tenantId, raffleId, limit).all<PurchaseRow>();
 
   if (!result.success) {
     return { ok: false, error: 'Falha ao buscar confirmações no D1.' as const };
@@ -283,7 +306,7 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
   return { ok: true as const, purchases };
 }
 
-async function listPurchasedNumbersFromD1(env: Bindings, raffleId: string) {
+async function listPurchasedNumbersFromD1(env: Bindings, tenantId: string, raffleId: string) {
   if (!env.DB) {
     return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
   }
@@ -292,10 +315,11 @@ async function listPurchasedNumbersFromD1(env: Bindings, raffleId: string) {
     `SELECT
       numbers_csv
     FROM rifa_purchases
-    WHERE raffle_id = ?`
+    WHERE tenant_id = ?
+      AND raffle_id = ?`
   );
 
-  const result = await statement.bind(raffleId).all<PurchasedNumbersRow>();
+  const result = await statement.bind(tenantId, raffleId).all<PurchasedNumbersRow>();
 
   if (!result.success) {
     return { ok: false, error: 'Falha ao buscar números comprados no D1.' as const };
@@ -363,6 +387,8 @@ function normalizePurchasePayload(payload: unknown) {
 
   return {
     buyerName: String(buyer.name || ''),
+    buyerCpf: String(buyer.cpf || ''),
+    buyerEmail: String(buyer.email || ''),
     buyerPhone: String(buyer.phone || ''),
     numbersCsv: numbers.join(','),
     numbersCount: numbers.length,
@@ -407,20 +433,179 @@ function resolveReturnBaseUrl(requestUrl: string, originHeader?: string, referer
   return new URL(requestUrl).origin;
 }
 
-function parseRifas(value?: string): Rifa[] {
+function parseRifas(value: string | undefined, tenantId: string): Rifa[] {
   if (!value) {
     return defaultRifas;
   }
 
   try {
-    const parsed = JSON.parse(value) as Rifa[];
+    const parsed = JSON.parse(value) as unknown;
+
     if (Array.isArray(parsed) && parsed.length) {
-      return parsed;
+      return parsed as Rifa[];
     }
+
+    if (parsed && typeof parsed === 'object') {
+      const record = parsed as Record<string, unknown>;
+      const tenantValue = record[tenantId] ?? record.default ?? record['*'];
+      if (Array.isArray(tenantValue) && tenantValue.length) {
+        return tenantValue as Rifa[];
+      }
+    }
+
     return defaultRifas;
   } catch {
     return defaultRifas;
   }
+}
+
+function resolveMercadoPagoAccessToken(value: string | undefined, tenantId: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!value.trim().startsWith('{')) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return value;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const candidate = record[tenantId] ?? record.default ?? record['*'];
+    if (typeof candidate === 'string' && candidate) {
+      return candidate;
+    }
+
+    return undefined;
+  } catch {
+    return value;
+  }
+}
+
+type TenantRequestLike = {
+  env: Bindings;
+  req: { url: string; header: (name: string) => string | undefined };
+};
+
+function resolveTenantId(c: TenantRequestLike) {
+  const env = c.env;
+  const defaultTenantId = sanitizeTenantId(env.TENANT_DEFAULT_ID) || 'default';
+
+  const overrideHeader = c.req.header('x-rifa-tenant');
+  if (env.TENANT_ALLOW_HEADER_OVERRIDE === '1' && overrideHeader) {
+    const overrideTenant = sanitizeTenantId(overrideHeader);
+    if (overrideTenant) {
+      return overrideTenant;
+    }
+  }
+
+  const tenantEnabled = env.TENANT_ENABLED === '1' || Boolean(env.TENANT_ROOT_DOMAIN) || Boolean(env.TENANT_MAP_JSON);
+  if (!tenantEnabled) {
+    return defaultTenantId;
+  }
+
+  const hostname = resolveHostname(c.req.url, c.req.header('Host'));
+  if (!hostname) {
+    return defaultTenantId;
+  }
+
+  const ignored = parseCommaList(env.TENANT_IGNORED_SUBDOMAINS);
+  const ignoredSubdomains = ignored.length ? ignored : ['www'];
+
+  const rootDomain = (env.TENANT_ROOT_DOMAIN || '').trim().toLowerCase();
+  const hostLower = hostname.toLowerCase();
+
+  const tenantSubdomain = resolveTenantSubdomain(hostLower, rootDomain);
+  if (!tenantSubdomain || ignoredSubdomains.includes(tenantSubdomain)) {
+    return defaultTenantId;
+  }
+
+  const tenantMap = parseJsonRecord(env.TENANT_MAP_JSON);
+  const mapped = tenantMap?.[tenantSubdomain] ?? tenantSubdomain;
+  return sanitizeTenantId(mapped) || defaultTenantId;
+}
+
+function resolveHostname(requestUrl: string, hostHeader?: string) {
+  try {
+    return new URL(requestUrl).hostname;
+  } catch {
+    if (!hostHeader) {
+      return '';
+    }
+    return hostHeader.split(':')[0] || '';
+  }
+}
+
+function resolveTenantSubdomain(hostname: string, rootDomain: string) {
+  if (!rootDomain) {
+    return '';
+  }
+
+  if (hostname === rootDomain) {
+    return '';
+  }
+
+  if (!hostname.endsWith(`.${rootDomain}`)) {
+    return '';
+  }
+
+  const prefix = hostname.slice(0, -(rootDomain.length + 1));
+  if (!prefix) {
+    return '';
+  }
+
+  return prefix.split('.')[0] || '';
+}
+
+function parseCommaList(value?: string) {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function parseJsonRecord(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return undefined;
+    }
+    return parsed as Record<string, string>;
+  } catch {
+    return undefined;
+  }
+}
+
+function sanitizeTenantId(value?: string) {
+  if (!value) {
+    return '';
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (trimmed.length > 64) {
+    return '';
+  }
+
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(trimmed)) {
+    return '';
+  }
+
+  return trimmed;
 }
 
 export default app;
