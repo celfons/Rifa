@@ -7,7 +7,7 @@
   const selectedNumbers = new Set();
 
   let raffle = {
-    id: String(config.RAFFLE_ID || 'rifa-principal'),
+    id: String(config.RAFFLE_ID || 'rifa'),
     name: 'Rifa principal',
     ticketPrice: fallbackTicketPrice,
     totalNumbers: fallbackTotalNumbers
