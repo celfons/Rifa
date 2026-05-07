@@ -328,6 +328,9 @@
     refs.form.reset();
     selectedNumbers.clear();
     refs.confirmButton.classList.add('d-none');
+    refs.grid.querySelectorAll('.number-btn.selected').forEach((button) => {
+      button.classList.remove('selected');
+    });
     renderSummary();
   }
 
@@ -377,7 +380,8 @@
       console.warn('Número comprado inválido recebido:', value);
       return;
     }
-    if (Number.isFinite(raffle.totalNumbers) && parsed > raffle.totalNumbers) {
+    const totalNumbers = Number(raffle.totalNumbers);
+    if (Number.isFinite(totalNumbers) && parsed > totalNumbers) {
       console.warn('Número comprado fora do intervalo da rifa:', value);
       return;
     }
