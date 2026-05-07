@@ -1,11 +1,12 @@
 (() => {
   const config = window.RIFA_CONFIG || {};
   const apiBaseUrl = String(config.API_BASE_URL || '/api').replace(/\/$/, '');
-  const notificationChannel = String(config.NOTIFICATION_CHANNEL || 'email_sms');
   const fallbackTicketPrice = Number(config.TICKET_PRICE || 10);
   const fallbackTotalNumbers = Number(config.TOTAL_NUMBERS || 100);
   const selectedNumbers = new Set();
+  const soldNumbers = new Set();
   const pendingPurchaseStorageKey = 'rifa_pending_purchase';
+  const purchasedNumbersLimit = 500;
 
   let raffle = {
     id: String(config.RAFFLE_ID || 'rifa'),
@@ -21,17 +22,12 @@
     selectedNumbers: document.getElementById('selectedNumbers'),
     totalAmount: document.getElementById('totalAmount'),
     form: document.getElementById('buyerForm'),
-    cpf: document.getElementById('cpf'),
     payButton: document.getElementById('payButton'),
     confirmButton: document.getElementById('confirmButton'),
     statusMessage: document.getElementById('statusMessage')
   };
 
   let pendingPurchase = null;
-
-  refs.cpf.addEventListener('input', (event) => {
-    event.target.value = maskCPF(event.target.value);
-  });
 
   refs.form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -51,19 +47,10 @@
     }
 
     const formData = new FormData(refs.form);
-    const cpfDigits = cleanDigits(String(formData.get('cpf')));
-
-    if (!isValidCPF(cpfDigits)) {
-      setStatus('CPF inválido. Verifique o número informado.', 'warning');
-      return;
-    }
-
     const payload = {
       raffleId: raffle.id,
       buyer: {
         name: String(formData.get('name')).trim(),
-        cpf: cpfDigits,
-        email: String(formData.get('email')).trim(),
         phone: String(formData.get('phone')).trim()
       },
       numbers: [...selectedNumbers].sort((a, b) => a - b),
@@ -155,12 +142,13 @@
         paymentStatus: payment.status,
         createdAt: new Date().toISOString(),
         notification: {
-          channel: notificationChannel,
-          status: 'pending'
+          channel: 'none',
+          status: 'skipped'
         }
       });
 
-      setStatus('Pagamento aprovado! Compra registrada para disparo de confirmação por e-mail/SMS.', 'success');
+      pendingPurchase.numbers.forEach((number) => addSoldNumber(number));
+      setStatus('Pagamento aprovado! Compra registrada sem envio de confirmação por SMS ou e-mail.', 'success');
       resetFlow();
     } catch (error) {
       setStatus(error.message || 'Erro ao confirmar pagamento.', 'danger');
@@ -293,6 +281,7 @@
 
     refs.totalNumbers = "1000";
     refs.ticketPrice = toBRL(10);
+    await loadPurchasedNumbers();
     renderNumbersGrid();
     renderSummary();
   }
@@ -306,16 +295,22 @@
       button.type = 'button';
       button.className = 'number-btn';
       button.textContent = String(i).padStart(2, '0');
-      button.addEventListener('click', () => {
-        if (selectedNumbers.has(i)) {
-          selectedNumbers.delete(i);
-          button.classList.remove('selected');
-        } else {
-          selectedNumbers.add(i);
-          button.classList.add('selected');
-        }
-        renderSummary();
-      });
+      if (soldNumbers.has(i)) {
+        button.disabled = true;
+        button.classList.add('sold');
+        button.setAttribute('aria-disabled', 'true');
+      } else {
+        button.addEventListener('click', () => {
+          if (selectedNumbers.has(i)) {
+            selectedNumbers.delete(i);
+            button.classList.remove('selected');
+          } else {
+            selectedNumbers.add(i);
+            button.classList.add('selected');
+          }
+          renderSummary();
+        });
+      }
       refs.grid.appendChild(button);
     }
   }
@@ -332,11 +327,7 @@
     refs.form.reset();
     selectedNumbers.clear();
     refs.confirmButton.classList.add('d-none');
-
-    refs.grid.querySelectorAll('.number-btn.selected').forEach((button) => {
-      button.classList.remove('selected');
-    });
-
+    renderNumbersGrid();
     renderSummary();
   }
 
@@ -358,44 +349,34 @@
     refs.statusMessage.classList.remove('d-none');
   }
 
-  function cleanDigits(value) {
-    return value.replace(/\D/g, '');
-  }
-
-  function isValidCPF(cpf) {
-    if (!cpf || cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
-      return false;
-    }
-
-    const calcDigit = (base, factor) => {
-      let total = 0;
-      for (let i = 0; i < base.length; i += 1) {
-        total += Number(base[i]) * (factor - i);
+  async function loadPurchasedNumbers() {
+    soldNumbers.clear();
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${purchasedNumbersLimit}`
+      );
+      if (!response.ok) {
+        throw new Error('Falha ao carregar números comprados.');
       }
-      const remainder = (total * 10) % 11;
-      return remainder === 10 ? 0 : remainder;
-    };
-
-    const firstDigit = calcDigit(cpf.slice(0, 9), 10);
-    const secondDigit = calcDigit(cpf.slice(0, 10), 11);
-    return firstDigit === Number(cpf[9]) && secondDigit === Number(cpf[10]);
+      const { purchases } = await response.json();
+      if (Array.isArray(purchases)) {
+        purchases.forEach((purchase) => {
+          if (Array.isArray(purchase.numbers)) {
+            purchase.numbers.forEach((number) => addSoldNumber(number));
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar números comprados.', error);
+    }
   }
 
-  function maskCPF(value) {
-    const digits = cleanDigits(value).slice(0, 11);
-    let masked = digits;
-
-    if (digits.length > 3) {
-      masked = `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  function addSoldNumber(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
     }
-    if (digits.length > 6) {
-      masked = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-    }
-    if (digits.length > 9) {
-      masked = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-    }
-
-    return masked;
+    soldNumbers.add(parsed);
   }
 
   function toBRL(value) {

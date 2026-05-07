@@ -335,8 +335,8 @@ function normalizePurchasePayload(payload: unknown) {
     preferenceId: String(data.preferenceId || ''),
     paymentId: String(data.paymentId || ''),
     paymentStatus: String(data.paymentStatus || ''),
-    notificationChannel: String(notification.channel || ''),
-    notificationStatus: String(notification.status || ''),
+    notificationChannel: String(notification.channel || 'none'),
+    notificationStatus: String(notification.status || 'skipped'),
     createdAt: String(data.createdAt || new Date().toISOString())
   };
 }

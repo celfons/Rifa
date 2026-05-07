@@ -4,7 +4,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 
 ## Funcionalidades
 - Seleção visual de números da rifa
-- Formulário com nome, CPF, telefone e e-mail
+- Formulário com nome e telefone
 - Pagamento com SDK client do Mercado Pago
 - APIs da rifa publicadas no backend Hono
 - Registro pós-confirmação no Cloudflare D1 via API backend
