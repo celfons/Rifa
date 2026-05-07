@@ -2,9 +2,8 @@ import { Hono } from 'hono';
 
 type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
-  FIREBASE_PROJECT_ID?: string;
-  FIREBASE_API_KEY?: string;
   RIFAS_JSON?: string;
+  DB?: D1Database;
 };
 
 type Rifa = {
@@ -12,6 +11,27 @@ type Rifa = {
   nome: string;
   preco: number;
   totalNumeros: number;
+};
+
+type PurchaseRow = {
+  id: number;
+  raffle_id: string;
+  buyer_name: string;
+  buyer_cpf: string;
+  buyer_email: string;
+  buyer_phone: string;
+  numbers_csv: string;
+  numbers_count: number;
+  ticket_price: number;
+  total_amount: number;
+  preference_id: string;
+  payment_id: string;
+  payment_status: string;
+  notification_channel: string;
+  notification_status: string;
+  created_at: string;
+  inserted_at: string;
+  raw_payload_json: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -119,61 +139,169 @@ app.post('/api/rifas/:id/confirmacao', async (c) => {
   const raffleId = c.req.param('id');
   const payload = await c.req.json();
 
-  const firebaseResult = await saveInFirebase(c.env, raffleId, payload);
+  const saveResult = await saveInD1(c.env, raffleId, payload);
 
-  if (!firebaseResult.ok) {
-    return c.json({ error: firebaseResult.error }, 502);
+  if (!saveResult.ok) {
+    return c.json({ error: saveResult.error }, 502);
   }
 
   return c.json({ success: true });
 });
 
-app.get('/health', (c) => c.json({ ok: true }));
+app.get('/api/rifas/:id/confirmacoes', async (c) => {
+  const raffleId = c.req.param('id');
+  const limit = parseConfirmationsLimit(c.req.query('limit'));
 
-async function saveInFirebase(env: Bindings, raffleId: string, payload: unknown) {
-  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_API_KEY) {
-    return { ok: false, error: 'FIREBASE_PROJECT_ID/FIREBASE_API_KEY não configurados.' as const };
+  const listResult = await listConfirmationsFromD1(c.env, raffleId, limit);
+
+  if (!listResult.ok) {
+    return c.json({ error: listResult.error }, 502);
   }
 
-  const url = new URL(
-    `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/rifaPurchases`
-  );
-  url.searchParams.set('key', env.FIREBASE_API_KEY);
+  return c.json({ purchases: listResult.purchases });
+});
+
+app.get('/health', (c) => c.json({ ok: true }));
+
+const DEFAULT_CONFIRMATIONS_LIMIT = 100;
+const MAX_CONFIRMATIONS_LIMIT = 500;
+
+async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
+  if (!env.DB) {
+    return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
+  }
 
   const purchase = normalizePurchasePayload(payload);
+  const statement = env.DB.prepare(
+    `INSERT INTO rifa_purchases (
+      raffle_id,
+      buyer_name,
+      buyer_cpf,
+      buyer_email,
+      buyer_phone,
+      numbers_csv,
+      numbers_count,
+      ticket_price,
+      total_amount,
+      preference_id,
+      payment_id,
+      payment_status,
+      notification_channel,
+      notification_status,
+      created_at,
+      raw_payload_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
 
-  const body = {
-    fields: {
-      raffleId: { stringValue: raffleId },
-      buyerName: { stringValue: purchase.buyerName },
-      buyerCpf: { stringValue: purchase.buyerCpf },
-      buyerEmail: { stringValue: purchase.buyerEmail },
-      buyerPhone: { stringValue: purchase.buyerPhone },
-      numbersCsv: { stringValue: purchase.numbersCsv },
-      numbersCount: { integerValue: String(purchase.numbersCount) },
-      ticketPrice: { doubleValue: purchase.ticketPrice },
-      totalAmount: { doubleValue: purchase.totalAmount },
-      preferenceId: { stringValue: purchase.preferenceId },
-      paymentId: { stringValue: purchase.paymentId },
-      paymentStatus: { stringValue: purchase.paymentStatus },
-      notificationChannel: { stringValue: purchase.notificationChannel },
-      notificationStatus: { stringValue: purchase.notificationStatus },
-      createdAt: { timestampValue: purchase.createdAt },
-      rawPayloadJson: { stringValue: JSON.stringify(payload) }
-    }
-  };
+  const result = await statement
+    .bind(
+      raffleId,
+      purchase.buyerName,
+      purchase.buyerCpf,
+      purchase.buyerEmail,
+      purchase.buyerPhone,
+      purchase.numbersCsv,
+      purchase.numbersCount,
+      purchase.ticketPrice,
+      purchase.totalAmount,
+      purchase.preferenceId,
+      purchase.paymentId,
+      purchase.paymentStatus,
+      purchase.notificationChannel,
+      purchase.notificationStatus,
+      purchase.createdAt,
+      JSON.stringify(payload)
+    )
+    .run();
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    return { ok: false, error: 'Falha ao salvar confirmação no Firestore.' as const };
+  if (!result.success) {
+    return { ok: false, error: 'Falha ao salvar confirmação no D1.' as const };
   }
 
   return { ok: true as const };
+}
+
+async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: number) {
+  if (!env.DB) {
+    return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
+  }
+
+  const statement = env.DB.prepare(
+    `SELECT
+      id,
+      raffle_id,
+      buyer_name,
+      buyer_cpf,
+      buyer_email,
+      buyer_phone,
+      numbers_csv,
+      numbers_count,
+      ticket_price,
+      total_amount,
+      preference_id,
+      payment_id,
+      payment_status,
+      notification_channel,
+      notification_status,
+      created_at,
+      inserted_at,
+      raw_payload_json
+    FROM rifa_purchases
+    WHERE raffle_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?`
+  );
+
+  const result = await statement.bind(raffleId, limit).all<PurchaseRow>();
+
+  if (!result.success) {
+    return { ok: false, error: 'Falha ao buscar confirmações no D1.' as const };
+  }
+
+  const purchases = result.results.map((row) => mapPurchaseRow(row));
+
+  return { ok: true as const, purchases };
+}
+
+function mapPurchaseRow(row: PurchaseRow) {
+  const numbersCsv = row.numbers_csv || '';
+  const numbers = parseNumbersCsv(numbersCsv);
+
+  return {
+    id: row.id,
+    raffleId: row.raffle_id || '',
+    buyer: {
+      name: row.buyer_name || '',
+      cpf: row.buyer_cpf || '',
+      email: row.buyer_email || '',
+      phone: row.buyer_phone || ''
+    },
+    numbers,
+    numbersCount: Number(row.numbers_count || 0),
+    ticketPrice: Number(row.ticket_price || 0),
+    totalAmount: Number(row.total_amount || 0),
+    preferenceId: row.preference_id || '',
+    paymentId: row.payment_id || '',
+    paymentStatus: row.payment_status || '',
+    notification: {
+      channel: row.notification_channel || '',
+      status: row.notification_status || ''
+    },
+    createdAt: row.created_at || '',
+    insertedAt: row.inserted_at || '',
+    rawPayloadJson: row.raw_payload_json || ''
+  };
+}
+
+function parseNumbersCsv(value: string) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizePurchasePayload(payload: unknown) {
@@ -199,6 +327,20 @@ function normalizePurchasePayload(payload: unknown) {
     notificationStatus: String(notification.status || ''),
     createdAt: String(data.createdAt || new Date().toISOString())
   };
+}
+
+function parseConfirmationsLimit(value?: string) {
+  if (!value) {
+    return DEFAULT_CONFIRMATIONS_LIMIT;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_CONFIRMATIONS_LIMIT;
+  }
+
+  const limit = Math.min(Math.floor(parsed), MAX_CONFIRMATIONS_LIMIT);
+  return limit;
 }
 
 function parseRifas(value?: string): Rifa[] {
