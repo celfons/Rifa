@@ -17,8 +17,6 @@ type PurchaseRow = {
   id: number;
   raffle_id: string;
   buyer_name: string;
-  buyer_cpf: string;
-  buyer_email: string;
   buyer_phone: string;
   numbers_csv: string;
   numbers_count: number;
@@ -204,8 +202,6 @@ async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
     `INSERT INTO rifa_purchases (
       raffle_id,
       buyer_name,
-      buyer_cpf,
-      buyer_email,
       buyer_phone,
       numbers_csv,
       numbers_count,
@@ -218,15 +214,13 @@ async function saveInD1(env: Bindings, raffleId: string, payload: unknown) {
       notification_status,
       created_at,
       raw_payload_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const result = await statement
     .bind(
       raffleId,
       purchase.buyerName,
-      purchase.buyerCpf,
-      purchase.buyerEmail,
       purchase.buyerPhone,
       purchase.numbersCsv,
       purchase.numbersCount,
@@ -259,8 +253,6 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
       id,
       raffle_id,
       buyer_name,
-      buyer_cpf,
-      buyer_email,
       buyer_phone,
       numbers_csv,
       numbers_count,
@@ -332,8 +324,6 @@ function mapPurchaseRow(row: PurchaseRow) {
     raffleId: row.raffle_id || '',
     buyer: {
       name: row.buyer_name || '',
-      cpf: row.buyer_cpf || '',
-      email: row.buyer_email || '',
       phone: row.buyer_phone || ''
     },
     numbers,
@@ -373,8 +363,6 @@ function normalizePurchasePayload(payload: unknown) {
 
   return {
     buyerName: String(buyer.name || ''),
-    buyerCpf: String(buyer.cpf || ''),
-    buyerEmail: String(buyer.email || ''),
     buyerPhone: String(buyer.phone || ''),
     numbersCsv: numbers.join(','),
     numbersCount: numbers.length,
