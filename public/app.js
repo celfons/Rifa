@@ -6,7 +6,6 @@
   const selectedNumbers = new Set();
   const purchasedNumbers = new Set();
   const pendingPurchaseStorageKey = 'rifa_pending_purchase';
-  const maxConfirmationsLimit = 500;
 
   let raffle = {
     id: String(config.RAFFLE_ID || 'rifa'),
@@ -295,6 +294,7 @@
       button.type = 'button';
       button.className = 'number-btn';
       button.textContent = String(i).padStart(2, '0');
+      button.dataset.number = String(i);
       if (purchasedNumbers.has(i)) {
         button.disabled = true;
         button.classList.add('sold');
@@ -353,18 +353,14 @@
     purchasedNumbers.clear();
     try {
       const response = await fetch(
-        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${maxConfirmationsLimit}`
+        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/numeros-comprados`
       );
       if (!response.ok) {
         throw new Error('Falha ao carregar números comprados.');
       }
-      const { purchases } = await response.json();
-      if (Array.isArray(purchases)) {
-        purchases.forEach((purchase) => {
-          if (Array.isArray(purchase.numbers)) {
-            purchase.numbers.forEach((number) => addPurchasedNumber(number));
-          }
-        });
+      const { numbers } = await response.json();
+      if (Array.isArray(numbers)) {
+        numbers.forEach((number) => addPurchasedNumber(number));
       }
     } catch (error) {
       console.warn('Não foi possível carregar números comprados.', error);
@@ -384,8 +380,11 @@
 
   function updateNumbersGridAvailability() {
     const buttons = refs.grid.querySelectorAll('.number-btn');
-    buttons.forEach((button, index) => {
-      const number = index + 1;
+    buttons.forEach((button) => {
+      const number = Number(button.dataset.number);
+      if (!Number.isInteger(number)) {
+        return;
+      }
       button.classList.remove('selected');
       if (purchasedNumbers.has(number)) {
         button.disabled = true;

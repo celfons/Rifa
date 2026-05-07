@@ -21,6 +21,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `GET /api/pagamentos/status?preferenceId=...` → consulta status de pagamento
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
 - `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
+- `GET /api/rifas/:id/numeros-comprados` → lista números comprados da rifa
 
 ## Configuração do front-end
 1. Copie `public/config.example.js` para `public/config.js`.
