@@ -2,8 +2,6 @@ CREATE TABLE IF NOT EXISTS rifa_purchases (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   raffle_id TEXT NOT NULL,
   buyer_name TEXT NOT NULL,
-  buyer_cpf TEXT NOT NULL,
-  buyer_email TEXT NOT NULL,
   buyer_phone TEXT NOT NULL,
   numbers_csv TEXT NOT NULL,
   numbers_count INTEGER NOT NULL,
