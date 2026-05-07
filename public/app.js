@@ -4,7 +4,7 @@
   const fallbackTicketPrice = Number(config.TICKET_PRICE || 10);
   const fallbackTotalNumbers = Number(config.TOTAL_NUMBERS || 100);
   const selectedNumbers = new Set();
-  const soldNumbers = new Set();
+  const purchasedNumbers = new Set();
   const pendingPurchaseStorageKey = 'rifa_pending_purchase';
   const maxConfirmationsLimit = 500;
 
@@ -147,7 +147,7 @@
         }
       });
 
-      pendingPurchase.numbers.forEach((number) => addSoldNumber(number));
+      pendingPurchase.numbers.forEach((number) => addPurchasedNumber(number));
       setStatus('Pagamento aprovado! Compra registrada sem envio de confirmação por SMS ou e-mail.', 'success');
       resetFlow();
     } catch (error) {
@@ -295,7 +295,7 @@
       button.type = 'button';
       button.className = 'number-btn';
       button.textContent = String(i).padStart(2, '0');
-      if (soldNumbers.has(i)) {
+      if (purchasedNumbers.has(i)) {
         button.disabled = true;
         button.classList.add('sold');
         button.setAttribute('aria-disabled', 'true');
@@ -350,14 +350,10 @@
   }
 
   async function loadPurchasedNumbers() {
-    soldNumbers.clear();
+    purchasedNumbers.clear();
     try {
-      const limit =
-        Number.isFinite(raffle.totalNumbers) && raffle.totalNumbers > 0
-          ? Math.min(raffle.totalNumbers, maxConfirmationsLimit)
-          : maxConfirmationsLimit;
       const response = await fetch(
-        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${limit}`
+        `${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/confirmacoes?limit=${maxConfirmationsLimit}`
       );
       if (!response.ok) {
         throw new Error('Falha ao carregar números comprados.');
@@ -366,7 +362,7 @@
       if (Array.isArray(purchases)) {
         purchases.forEach((purchase) => {
           if (Array.isArray(purchase.numbers)) {
-            purchase.numbers.forEach((number) => addSoldNumber(number));
+            purchase.numbers.forEach((number) => addPurchasedNumber(number));
           }
         });
       }
@@ -375,7 +371,7 @@
     }
   }
 
-  function addSoldNumber(value) {
+  function addPurchasedNumber(value) {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
       return;
@@ -383,7 +379,7 @@
     if (Number.isFinite(raffle.totalNumbers) && parsed > raffle.totalNumbers) {
       return;
     }
-    soldNumbers.add(parsed);
+    purchasedNumbers.add(parsed);
   }
 
   function updateNumbersGridAvailability() {
@@ -391,7 +387,7 @@
     buttons.forEach((button, index) => {
       const number = index + 1;
       button.classList.remove('selected');
-      if (soldNumbers.has(number)) {
+      if (purchasedNumbers.has(number)) {
         button.disabled = true;
         button.classList.add('sold');
         button.setAttribute('aria-disabled', 'true');
