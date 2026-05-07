@@ -219,8 +219,6 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
       tenant_id,
       raffle_id,
       buyer_name,
-      buyer_cpf,
-      buyer_email,
       buyer_phone,
       numbers_csv,
       numbers_count,
@@ -233,7 +231,7 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
       notification_status,
       created_at,
       raw_payload_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const result = await statement
@@ -241,8 +239,6 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
       tenantId,
       raffleId,
       purchase.buyerName,
-      purchase.buyerCpf,
-      purchase.buyerEmail,
       purchase.buyerPhone,
       purchase.numbersCsv,
       purchase.numbersCount,
@@ -387,8 +383,6 @@ function normalizePurchasePayload(payload: unknown) {
 
   return {
     buyerName: String(buyer.name || ''),
-    buyerCpf: String(buyer.cpf || ''),
-    buyerEmail: String(buyer.email || ''),
     buyerPhone: String(buyer.phone || ''),
     numbersCsv: numbers.join(','),
     numbersCount: numbers.length,
