@@ -243,7 +243,7 @@
   }
 
   async function handlePaymentReturn(returnInfo) {
-    if (!returnInfo?.hasReturn) {
+    if (!returnInfo.hasReturn) {
       return;
     }
 
@@ -257,9 +257,18 @@
       return;
     }
 
-    if (returnInfo.preferenceId && pendingPurchase.preferenceId !== returnInfo.preferenceId) {
-      pendingPurchase = { ...pendingPurchase, preferenceId: returnInfo.preferenceId };
-      savePendingPurchase(pendingPurchase);
+    if (returnInfo.preferenceId) {
+      if (!pendingPurchase.preferenceId) {
+        pendingPurchase = { ...pendingPurchase, preferenceId: returnInfo.preferenceId };
+        savePendingPurchase(pendingPurchase);
+      } else if (pendingPurchase.preferenceId !== returnInfo.preferenceId) {
+        refs.confirmButton.classList.remove('d-none');
+        setStatus(
+          'Retorno do Mercado Pago não corresponde à compra salva. Confirme manualmente ou inicie uma nova compra.',
+          'warning'
+        );
+        return;
+      }
     }
 
     refs.confirmButton.classList.remove('d-none');
