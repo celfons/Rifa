@@ -13,6 +13,27 @@ type Rifa = {
   totalNumeros: number;
 };
 
+type PurchaseRow = {
+  id: number;
+  raffle_id: string;
+  buyer_name: string;
+  buyer_cpf: string;
+  buyer_email: string;
+  buyer_phone: string;
+  numbers_csv: string;
+  numbers_count: number;
+  ticket_price: number;
+  total_amount: number;
+  preference_id: string;
+  payment_id: string;
+  payment_status: string;
+  notification_channel: string;
+  notification_status: string;
+  created_at: string;
+  inserted_at: string;
+  raw_payload_json: string;
+};
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 const defaultRifas: Rifa[] = [
@@ -231,43 +252,43 @@ async function listConfirmationsFromD1(env: Bindings, raffleId: string, limit: n
     LIMIT ?`
   );
 
-  const result = await statement.bind(raffleId, limit).all();
+  const result = await statement.bind(raffleId, limit).all<PurchaseRow>();
 
   if (!result.success) {
     return { ok: false, error: 'Falha ao buscar confirmações no D1.' as const };
   }
 
-  const purchases = (result.results || []).map((row) => mapPurchaseRow(row as Record<string, unknown>));
+  const purchases = result.results.map((row) => mapPurchaseRow(row));
 
   return { ok: true as const, purchases };
 }
 
-function mapPurchaseRow(row: Record<string, unknown>) {
-  const numbersCsv = String(row.numbers_csv || '');
+function mapPurchaseRow(row: PurchaseRow) {
+  const numbersCsv = row.numbers_csv || '';
 
   return {
-    id: Number(row.id || 0),
-    raffleId: String(row.raffle_id || ''),
+    id: row.id,
+    raffleId: row.raffle_id || '',
     buyer: {
-      name: String(row.buyer_name || ''),
-      cpf: String(row.buyer_cpf || ''),
-      email: String(row.buyer_email || ''),
-      phone: String(row.buyer_phone || '')
+      name: row.buyer_name || '',
+      cpf: row.buyer_cpf || '',
+      email: row.buyer_email || '',
+      phone: row.buyer_phone || ''
     },
     numbers: numbersCsv ? numbersCsv.split(',').filter(Boolean) : [],
     numbersCount: Number(row.numbers_count || 0),
     ticketPrice: Number(row.ticket_price || 0),
     totalAmount: Number(row.total_amount || 0),
-    preferenceId: String(row.preference_id || ''),
-    paymentId: String(row.payment_id || ''),
-    paymentStatus: String(row.payment_status || ''),
+    preferenceId: row.preference_id || '',
+    paymentId: row.payment_id || '',
+    paymentStatus: row.payment_status || '',
     notification: {
-      channel: String(row.notification_channel || ''),
-      status: String(row.notification_status || '')
+      channel: row.notification_channel || '',
+      status: row.notification_status || ''
     },
-    createdAt: String(row.created_at || ''),
-    insertedAt: String(row.inserted_at || ''),
-    rawPayloadJson: String(row.raw_payload_json || '')
+    createdAt: row.created_at || '',
+    insertedAt: row.inserted_at || '',
+    rawPayloadJson: row.raw_payload_json || ''
   };
 }
 
@@ -307,7 +328,7 @@ function parseConfirmationsLimit(value?: string) {
   }
 
   const bounded = Math.min(Math.max(Math.trunc(parsed), 1), MAX_CONFIRMATIONS_LIMIT);
-  return bounded || DEFAULT_CONFIRMATIONS_LIMIT;
+  return bounded;
 }
 
 function parseRifas(value?: string): Rifa[] {
