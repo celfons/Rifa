@@ -10,7 +10,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - Registro pós-confirmação no Firebase (Firestore) via API backend
 
 ## Estrutura
-- Front-end: `index.html`, `styles.css`, `app.js`, `config.example.js`
+- Front-end: `public/index.html`, `public/styles.css`, `public/app.js`, `public/config.example.js`
 - API Hono (Worker): `src/hono-app.ts`, `src/worker.ts`
 - API Hono (Pages Functions): `functions/[[path]].ts`
 - Configuração Cloudflare: `wrangler.toml`
@@ -22,7 +22,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no Firestore
 
 ## Configuração do front-end
-1. Copie `config.example.js` para `config.js`.
+1. Copie `public/config.example.js` para `public/config.js`.
 2. Ajuste:
    - `MERCADO_PAGO_PUBLIC_KEY`
    - `API_BASE_URL` (em Cloudflare, normalmente `/api`)
@@ -43,7 +43,7 @@ Exemplo de `RIFAS_JSON`:
 ## Desenvolvimento local
 ```bash
 npm install
-cp config.example.js config.js
+cp public/config.example.js public/config.js
 npm run typecheck
 ```
 
