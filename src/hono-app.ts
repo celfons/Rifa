@@ -73,6 +73,12 @@ app.post('/api/pagamentos/preferencia', async (c) => {
     return c.json({ error: 'Payload inválido para criação de preferência.' }, 400);
   }
 
+  const returnBaseUrl = resolveReturnBaseUrl(
+    c.req.url,
+    c.req.header('Origin'),
+    c.req.header('Referer')
+  );
+
   const preferencePayload = {
     items: [
       {
@@ -83,6 +89,12 @@ app.post('/api/pagamentos/preferencia', async (c) => {
         currency_id: 'BRL'
       }
     ],
+    back_urls: {
+      success: returnBaseUrl,
+      pending: returnBaseUrl,
+      failure: returnBaseUrl
+    },
+    auto_return: 'approved',
     metadata: {
       raffleId,
       numbers,
@@ -341,6 +353,22 @@ function parseConfirmationsLimit(value?: string) {
 
   const limit = Math.min(Math.floor(parsed), MAX_CONFIRMATIONS_LIMIT);
   return limit;
+}
+
+function resolveReturnBaseUrl(requestUrl: string, originHeader?: string, refererHeader?: string) {
+  const candidates = [originHeader, refererHeader].filter(
+    (value): value is string => Boolean(value && value !== 'null')
+  );
+
+  for (const candidate of candidates) {
+    try {
+      return new URL(candidate).origin;
+    } catch {
+      continue;
+    }
+  }
+
+  return new URL(requestUrl).origin;
 }
 
 function parseRifas(value?: string): Rifa[] {
