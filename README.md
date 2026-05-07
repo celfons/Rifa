@@ -34,7 +34,7 @@ Defina no Worker/Pages:
 - `MERCADO_PAGO_ACCESS_TOKEN`
 - `RIFAS_JSON` (opcional, JSON com rifas)
 
-Configure o binding do D1 com o nome `DB` no `wrangler.toml` e no painel da Cloudflare (Workers ou Pages). Substitua o `database_id` pelo ID real do seu banco D1.
+Configure o binding do D1 com o nome `DB` no `wrangler.toml` e no painel da Cloudflare (Workers ou Pages). Informe o `database_id` do seu banco D1 no `wrangler.toml` (de preferência em um bloco de ambiente como `[env.production]`).
 
 Exemplo de `RIFAS_JSON`:
 ```json

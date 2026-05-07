@@ -8,8 +8,7 @@ directory = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "rifa-db"
-# IMPORTANTE: substitua pelo ID real do seu banco D1 antes do deploy.
-database_id = "123e4567-e89b-12d3-a456-426614174000"
+# Defina o database_id no ambiente de deploy (ex.: [env.production]).
 
 [vars]
 RIFAS_JSON = '[{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}]'
