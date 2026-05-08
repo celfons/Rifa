@@ -63,6 +63,33 @@ Exemplo de `MERCADO_PAGO_ACCESS_TOKEN` por tenant:
 }
 ```
 
+Exemplo para tenant igual ao subdomínio (`maya` em `maya.example.com`), no Cloudflare:
+
+```env
+TENANT_ENABLED=1
+TENANT_ROOT_DOMAIN=example.com
+TENANT_DEFAULT_ID=default
+TENANT_IGNORED_SUBDOMAINS=www
+```
+
+```json
+// RIFAS_JSON
+{
+  "default": [{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}],
+  "maya": [{"id":"rifa-maya","nome":"Rifa Maya","preco":15,"totalNumeros":200}]
+}
+```
+
+```json
+// MERCADO_PAGO_ACCESS_TOKEN
+{
+  "default": "TOKEN_PADRAO",
+  "maya": "TOKEN_DO_TENANT_MAYA"
+}
+```
+
+Com essa configuração, quando a URL for `maya.example.com`, o tenant resolvido será `maya` (igual ao subdomínio). Nesse cenário, `TENANT_MAP_JSON` não é necessário.
+
 ## Desenvolvimento local
 ```bash
 npm install
