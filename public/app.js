@@ -279,11 +279,26 @@
       setStatus('Usando configuração local de rifa, API de rifas indisponível no momento.', 'warning');
     }
 
-    refs.totalNumbers = "1000";
-    refs.ticketPrice = toBRL(10);
+    raffle = {
+      ...raffle,
+      ticketPrice: Number(raffle.ticketPrice ?? fallbackTicketPrice),
+      totalNumbers: Number(raffle.totalNumbers ?? fallbackTotalNumbers)
+    };
+
+    renderRaffleInfo();
     await loadPurchasedNumbers();
     renderNumbersGrid();
     renderSummary();
+  }
+
+  function renderRaffleInfo() {
+    if (refs.totalNumbers) {
+      refs.totalNumbers.textContent = String(raffle.totalNumbers);
+    }
+
+    if (refs.ticketPrice) {
+      refs.ticketPrice.textContent = toBRL(raffle.ticketPrice);
+    }
   }
 
   function renderNumbersGrid() {

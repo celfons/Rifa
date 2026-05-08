@@ -29,6 +29,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
    - `MERCADO_PAGO_PUBLIC_KEY`
    - `API_BASE_URL` (em Cloudflare, normalmente `/api`)
    - `RAFFLE_ID` (opcional)
+   - `TICKET_PRICE` e `TOTAL_NUMBERS` (fallback quando a API `/api/rifas` estiver indisponível)
 
 ## Configuração de variáveis no Cloudflare (backend)
 Defina no Worker/Pages:
