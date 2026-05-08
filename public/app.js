@@ -1,5 +1,5 @@
 (() => {
-  const config = window.RIFA_CONFIG || {};
+  const config = { ...(window.RIFA_CONFIG || {}) };
   const apiBaseUrl = String(config.API_BASE_URL || '/api').replace(/\/$/, '');
   const fallbackTicketPrice = Number(config.TICKET_PRICE || 10);
   const fallbackTotalNumbers = Number(config.TOTAL_NUMBERS || 100);
@@ -416,10 +416,27 @@
   }
 
   async function init() {
+    await loadRuntimeConfigFromApi();
     await loadRaffle();
     const returnInfo = getPaymentReturnInfo();
     restorePendingPurchaseFromStorage({ showMessage: !returnInfo.hasReturn });
     await handlePaymentReturn(returnInfo);
+  }
+
+  async function loadRuntimeConfigFromApi() {
+    try {
+      const response = await fetch(`${apiBaseUrl}/config`);
+      if (!response.ok) {
+        return;
+      }
+
+      const apiConfig = await response.json();
+      if (typeof apiConfig?.mercadoPagoPublicKey === 'string' && apiConfig.mercadoPagoPublicKey) {
+        config.MERCADO_PAGO_PUBLIC_KEY = apiConfig.mercadoPagoPublicKey;
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar configuração dinâmica da API.', error);
+    }
   }
 
   void init();

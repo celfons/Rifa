@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 
 type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
+  MERCADO_PAGO_PUBLIC_KEY?: string;
   RIFAS_JSON?: string;
   DB?: D1Database;
   TENANT_ENABLED?: string;
@@ -73,6 +74,14 @@ app.get('/api/rifas', (c) => {
       ticketPrice: rifa.preco,
       totalNumbers: rifa.totalNumeros
     }))
+  });
+});
+
+app.get('/api/config', (c) => {
+  const mercadoPagoPublicKey = resolveMercadoPagoPublicKey(c.env.MERCADO_PAGO_PUBLIC_KEY, c.get('tenantId'));
+
+  return c.json({
+    mercadoPagoPublicKey: mercadoPagoPublicKey || null
   });
 });
 
@@ -454,6 +463,14 @@ function parseRifas(value: string | undefined, tenantId: string): Rifa[] {
 }
 
 function resolveMercadoPagoAccessToken(value: string | undefined, tenantId: string) {
+  return resolveTenantScopedString(value, tenantId);
+}
+
+function resolveMercadoPagoPublicKey(value: string | undefined, tenantId: string) {
+  return resolveTenantScopedString(value, tenantId);
+}
+
+function resolveTenantScopedString(value: string | undefined, tenantId: string) {
   if (!value) {
     return undefined;
   }
