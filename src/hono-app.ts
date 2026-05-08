@@ -139,8 +139,8 @@ app.post('/api/pagamentos/preferencia', async (c) => {
   });
 
   if (!response.ok) {
-    console.error('MercadoPago error:', data);
-    return c.json({ error: data }, 502);
+    console.error('MercadoPago error:', response);
+    return c.json({ error: response }, 502);
   }
 
   const data = await response.json<{ id?: string }>();
