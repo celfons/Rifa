@@ -139,8 +139,20 @@ app.post('/api/pagamentos/preferencia', async (c) => {
   });
 
   if (!response.ok) {
-    console.error('MercadoPago error:', JSON.stringify(response));
-    return c.json({ error: JSON.stringify(response) }, 502);
+    let errorData;
+  
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = await response.text();
+    }
+  
+    console.error('MercadoPago error:', errorData);
+  
+    return c.json({
+      error: 'Erro ao criar preferência no Mercado Pago',
+      details: errorData
+    }, 502);
   }
 
   const data = await response.json<{ id?: string }>();
