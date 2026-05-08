@@ -11,4 +11,9 @@ database_name = "rifa"
 # Defina o database_id no ambiente de deploy (ex.: [env.production]).
 
 [vars]
-RIFAS_JSON = '[{"id":"rifa","nome":"Rifa Solidária","preco":10,"totalNumeros":1000}]'
+TENANT_ENABLED = "1"
+TENANT_ROOT_DOMAIN = "example.com"
+TENANT_DEFAULT_ID = "default"
+TENANT_IGNORED_SUBDOMAINS = "www"
+RIFAS_JSON = '{"default":[{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":100}],"maya":[{"id":"rifa-maya","nome":"Rifa Maya","preco":15,"totalNumeros":200}]}'
+MERCADO_PAGO_ACCESS_TOKEN = '{"default":"TOKEN_PADRAO","maya":"TOKEN_DO_TENANT_MAYA"}'
