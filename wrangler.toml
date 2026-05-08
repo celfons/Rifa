@@ -17,4 +17,4 @@ TENANT_DEFAULT_ID = "default"
 TENANT_IGNORED_SUBDOMAINS = "www"
 RIFAS_JSON = '{"default":[{"id":"rifa-principal","nome":"Rifa Solidária","preco":10,"totalNumeros":1000}],"maya":[{"id":"rifa-maya","nome":"Rifa Maya","preco":20,"totalNumeros":200}]}'
 MERCADO_PAGO_ACCESS_TOKEN = '{"default":"TOKEN_PADRAO","maya":"TOKEN_DO_TENANT_MAYA"}'
-MERCADO_PAGO_PUBLIC_KEY = '{"default":"APP_USR-CHAVE_PUBLICA_PADRAO","maya":"APP_USR-CHAVE_PUBLICA_MAYA"}'
+MERCADO_PAGO_PUBLIC_KEY = '{"default":"APP_USR-a1e2d024-456c-4e75-8f93-b6eab6d96083","maya":"APP_USR-CHAVE_PUBLICA_MAYA"}'
