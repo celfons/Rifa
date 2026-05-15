@@ -1,7 +1,7 @@
 (() => {
   const config = { ...(window.RIFA_CONFIG || {}) };
   const apiBaseUrl = String(config.API_BASE_URL || '/api').replace(/\/$/, '');
-  const buyersLimit = Number(config.BUYERS_PAGE_LIMIT || 200);
+  const buyersLimit = Number(config.BUYERS_PAGE_LIMIT || 100);
 
   const refs = {
     tenantId: document.getElementById('tenantId'),

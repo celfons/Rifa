@@ -408,7 +408,13 @@ async function listBuyersFromD1(env: Bindings, tenantId: string, limit: number) 
     return { ok: false, error: 'Falha ao buscar compradores no D1.' as const };
   }
 
-  const buyers = result.results.map((row) => ({
+  const buyers = result.results.map((row) => mapBuyerRow(row));
+
+  return { ok: true as const, buyers };
+}
+
+function mapBuyerRow(row: BuyerRow) {
+  return {
     raffleId: row.raffle_id || '',
     name: row.buyer_name || '',
     phone: row.buyer_phone || '',
@@ -416,9 +422,7 @@ async function listBuyersFromD1(env: Bindings, tenantId: string, limit: number) 
     totalAmount: Number(row.total_amount || 0),
     paymentStatus: row.payment_status || '',
     createdAt: row.created_at || ''
-  }));
-
-  return { ok: true as const, buyers };
+  };
 }
 
 function mapPurchaseRow(row: PurchaseRow) {
