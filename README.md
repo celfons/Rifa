@@ -11,6 +11,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 
 ## Estrutura
 - Front-end: `public/index.html`, `public/styles.css`, `public/app.js`, `public/config.example.js`
+- Página de compradores: `public/compradores.html`, `public/compradores.js`
 - API Hono (Worker): `src/hono-app.ts`, `src/worker.ts`
 - API Hono (Pages Functions): `functions/[[path]].ts`
 - Configuração Cloudflare: `wrangler.toml`
@@ -23,6 +24,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
 - `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
 - `GET /api/rifas/:id/numeros-comprados` → lista números comprados da rifa
+- `GET /api/compradores?limit=100` → lista compradores do tenant atual (Cloudflare D1)
 
 ## Configuração do front-end
 1. Copie `public/config.example.js` para `public/config.js`.
