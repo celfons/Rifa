@@ -721,6 +721,37 @@ function buildOpenApiSpec(serverUrl: string) {
       description: 'Documentação dos endpoints da API de rifa.'
     },
     servers: [{ url: serverUrl }],
+    components: {
+      schemas: {
+        Buyer: {
+          type: 'object',
+          required: ['name', 'phone'],
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Nome completo do comprador'
+            },
+            phone: {
+              type: 'string',
+              description: 'Telefone do comprador com DDD'
+            }
+          }
+        },
+        Notification: {
+          type: 'object',
+          properties: {
+            channel: {
+              type: 'string',
+              description: 'Canal de notificação usado (ex.: webhook, none)'
+            },
+            status: {
+              type: 'string',
+              description: 'Status da notificação (ex.: sent, skipped, failed)'
+            }
+          }
+        }
+      }
+    },
     paths: {
       '/health': {
         get: {
@@ -777,11 +808,7 @@ function buildOpenApiSpec(serverUrl: string) {
                       description: 'Preço unitário do bilhete'
                     },
                     buyer: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        phone: { type: 'string' }
-                      }
+                      $ref: '#/components/schemas/Buyer'
                     }
                   }
                 }
@@ -848,11 +875,7 @@ function buildOpenApiSpec(serverUrl: string) {
                   required: ['buyer', 'numbers', 'ticketPrice', 'totalAmount'],
                   properties: {
                     buyer: {
-                      type: 'object',
-                      properties: {
-                        name: { type: 'string' },
-                        phone: { type: 'string' }
-                      }
+                      $ref: '#/components/schemas/Buyer'
                     },
                     numbers: {
                       type: 'array',
@@ -877,11 +900,7 @@ function buildOpenApiSpec(serverUrl: string) {
                       type: 'string'
                     },
                     notification: {
-                      type: 'object',
-                      properties: {
-                        channel: { type: 'string' },
-                        status: { type: 'string' }
-                      }
+                      $ref: '#/components/schemas/Notification'
                     },
                     createdAt: {
                       type: 'string',
