@@ -883,7 +883,8 @@ function buildOpenApiSpec(serverUrl: string) {
                     },
                     numbersCount: {
                       type: 'integer',
-                      description: 'Quantidade de números selecionados na compra'
+                      description:
+                        'Quantidade de números selecionados na compra (opcional, pode ser inferida pelo tamanho de `numbers`)'
                     },
                     ticketPrice: {
                       type: 'number'
@@ -939,6 +940,7 @@ function buildOpenApiSpec(serverUrl: string) {
               name: 'limit',
               in: 'query',
               required: false,
+              description: 'Limite de registros retornados (máximo 500)',
               schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
             }
           ],
@@ -981,6 +983,7 @@ function buildOpenApiSpec(serverUrl: string) {
               name: 'limit',
               in: 'query',
               required: false,
+              description: 'Limite de registros retornados (máximo 500)',
               schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
             }
           ],
