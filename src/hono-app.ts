@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { swaggerUI } from '@hono/swagger-ui';
 
 type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
@@ -63,29 +64,7 @@ app.get('/openapi.json', (c) => {
   return c.json(buildOpenApiSpec(new URL(c.req.url).origin));
 });
 
-app.get('/swagger', (c) => {
-  return c.html(`<!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rifa API - Swagger UI</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
-  </head>
-  <body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script>
-      window.onload = function () {
-        window.SwaggerUIBundle({
-          url: '/openapi.json',
-          dom_id: '#swagger-ui'
-        });
-      };
-    </script>
-  </body>
-</html>`);
-});
+app.get('/swagger', swaggerUI({ url: '/openapi.json' }));
 
 const defaultRifas: Rifa[] = [
   {
@@ -781,7 +760,30 @@ function buildOpenApiSpec(serverUrl: string) {
             content: {
               'application/json': {
                 schema: {
-                  type: 'object'
+                  type: 'object',
+                  required: ['numbers', 'raffleId', 'ticketPrice'],
+                  properties: {
+                    numbers: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Números selecionados da rifa'
+                    },
+                    raffleId: {
+                      type: 'string',
+                      description: 'Identificador da rifa'
+                    },
+                    ticketPrice: {
+                      type: 'number',
+                      description: 'Preço unitário do bilhete'
+                    },
+                    buyer: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        phone: { type: 'string' }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -842,7 +844,50 @@ function buildOpenApiSpec(serverUrl: string) {
             content: {
               'application/json': {
                 schema: {
-                  type: 'object'
+                  type: 'object',
+                  required: ['buyer', 'numbers', 'ticketPrice', 'totalAmount'],
+                  properties: {
+                    buyer: {
+                      type: 'object',
+                      properties: {
+                        name: { type: 'string' },
+                        phone: { type: 'string' }
+                      }
+                    },
+                    numbers: {
+                      type: 'array',
+                      items: { type: 'string' }
+                    },
+                    numbersCount: {
+                      type: 'integer'
+                    },
+                    ticketPrice: {
+                      type: 'number'
+                    },
+                    totalAmount: {
+                      type: 'number'
+                    },
+                    preferenceId: {
+                      type: 'string'
+                    },
+                    paymentId: {
+                      type: 'string'
+                    },
+                    paymentStatus: {
+                      type: 'string'
+                    },
+                    notification: {
+                      type: 'object',
+                      properties: {
+                        channel: { type: 'string' },
+                        status: { type: 'string' }
+                      }
+                    },
+                    createdAt: {
+                      type: 'string',
+                      format: 'date-time'
+                    }
+                  }
                 }
               }
             }
