@@ -59,6 +59,34 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+app.get('/openapi.json', (c) => {
+  return c.json(buildOpenApiSpec(new URL(c.req.url).origin));
+});
+
+app.get('/swagger', (c) => {
+  return c.html(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rifa API - Swagger UI</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = function () {
+        window.SwaggerUIBundle({
+          url: '/openapi.json',
+          dom_id: '#swagger-ui'
+        });
+      };
+    </script>
+  </body>
+</html>`);
+});
+
 const defaultRifas: Rifa[] = [
   {
     id: 'rifa-principal',
@@ -703,6 +731,203 @@ function sanitizeTenantId(value?: string) {
   }
 
   return trimmed;
+}
+
+function buildOpenApiSpec(serverUrl: string) {
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'Rifa API',
+      version: '1.0.0',
+      description: 'Documentação dos endpoints da API de rifa.'
+    },
+    servers: [{ url: serverUrl }],
+    paths: {
+      '/health': {
+        get: {
+          summary: 'Health check',
+          responses: {
+            '200': {
+              description: 'Serviço ativo'
+            }
+          }
+        }
+      },
+      '/api/rifas': {
+        get: {
+          summary: 'Lista rifas disponíveis',
+          responses: {
+            '200': {
+              description: 'Rifas disponíveis'
+            }
+          }
+        }
+      },
+      '/api/config': {
+        get: {
+          summary: 'Retorna configuração pública por tenant',
+          responses: {
+            '200': {
+              description: 'Configuração pública carregada'
+            }
+          }
+        }
+      },
+      '/api/pagamentos/preferencia': {
+        post: {
+          summary: 'Cria preferência no Mercado Pago',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object'
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Preferência criada'
+            },
+            '400': {
+              description: 'Payload inválido'
+            },
+            '500': {
+              description: 'Token ausente'
+            },
+            '502': {
+              description: 'Erro no Mercado Pago'
+            }
+          }
+        }
+      },
+      '/api/pagamentos/status': {
+        get: {
+          summary: 'Consulta status de pagamento',
+          parameters: [
+            {
+              name: 'preferenceId',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Status retornado'
+            },
+            '400': {
+              description: 'Parâmetros ausentes'
+            },
+            '502': {
+              description: 'Erro ao consultar status'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/confirmacao': {
+        post: {
+          summary: 'Salva confirmação de pagamento',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object'
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Confirmação salva'
+            },
+            '502': {
+              description: 'Falha ao persistir confirmação'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/confirmacoes': {
+        get: {
+          summary: 'Lista confirmações da rifa',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Confirmações retornadas'
+            },
+            '502': {
+              description: 'Falha ao listar confirmações'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/numeros-comprados': {
+        get: {
+          summary: 'Lista números comprados da rifa',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Números retornados'
+            },
+            '502': {
+              description: 'Falha ao listar números'
+            }
+          }
+        }
+      },
+      '/api/compradores': {
+        get: {
+          summary: 'Lista compradores do tenant atual',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Compradores retornados'
+            },
+            '502': {
+              description: 'Falha ao listar compradores'
+            }
+          }
+        }
+      }
+    }
+  };
 }
 
 export default app;

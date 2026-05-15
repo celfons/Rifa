@@ -17,6 +17,8 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - Configuração Cloudflare: `wrangler.toml`
 
 ## Endpoints da API (Hono)
+- `GET /openapi.json` → especificação OpenAPI 3.0 da API
+- `GET /swagger` → interface Swagger UI para explorar e testar endpoints
 - `GET /api/rifas` → lista rifas disponíveis
 - `GET /api/config` → retorna configuração pública por tenant (ex.: chave pública do Mercado Pago)
 - `POST /api/pagamentos/preferencia` → cria preferência no Mercado Pago
