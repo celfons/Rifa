@@ -879,7 +879,8 @@ function buildOpenApiSpec(serverUrl: string) {
                     },
                     numbers: {
                       type: 'array',
-                      items: { type: 'string' }
+                      items: { type: 'string' },
+                      description: 'Números da rifa confirmados na compra'
                     },
                     numbersCount: {
                       type: 'integer',
@@ -887,10 +888,12 @@ function buildOpenApiSpec(serverUrl: string) {
                         'Quantidade de números selecionados na compra (opcional, pode ser inferida pelo tamanho de `numbers`)'
                     },
                     ticketPrice: {
-                      type: 'number'
+                      type: 'number',
+                      description: 'Preço unitário do número da rifa'
                     },
                     totalAmount: {
-                      type: 'number'
+                      type: 'number',
+                      description: 'Valor total da compra para os números selecionados'
                     },
                     preferenceId: {
                       type: 'string',
