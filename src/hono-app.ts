@@ -882,7 +882,8 @@ function buildOpenApiSpec(serverUrl: string) {
                       items: { type: 'string' }
                     },
                     numbersCount: {
-                      type: 'integer'
+                      type: 'integer',
+                      description: 'Quantidade de números selecionados na compra'
                     },
                     ticketPrice: {
                       type: 'number'
@@ -891,13 +892,16 @@ function buildOpenApiSpec(serverUrl: string) {
                       type: 'number'
                     },
                     preferenceId: {
-                      type: 'string'
+                      type: 'string',
+                      description: 'Identificador da preferência no Mercado Pago'
                     },
                     paymentId: {
-                      type: 'string'
+                      type: 'string',
+                      description: 'Identificador do pagamento no Mercado Pago'
                     },
                     paymentStatus: {
-                      type: 'string'
+                      type: 'string',
+                      description: 'Status atual do pagamento'
                     },
                     notification: {
                       $ref: '#/components/schemas/Notification'
