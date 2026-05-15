@@ -418,11 +418,16 @@ function mapBuyerRow(row: BuyerRow) {
     raffleId: row.raffle_id || '',
     name: row.buyer_name || '',
     phone: row.buyer_phone || '',
-    numbersCount: Number(row.numbers_count || 0),
-    totalAmount: Number(row.total_amount || 0),
+    numbersCount: toSafeNumber(row.numbers_count),
+    totalAmount: toSafeNumber(row.total_amount),
     paymentStatus: row.payment_status || '',
     createdAt: row.created_at || ''
   };
+}
+
+function toSafeNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function mapPurchaseRow(row: PurchaseRow) {

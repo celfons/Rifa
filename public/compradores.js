@@ -10,9 +10,6 @@
     tableBody: document.getElementById('buyersTableBody')
   };
 
-  const tableColumnCount =
-    refs.tableBody?.closest('table')?.querySelectorAll('thead th')?.length || 1;
-
   function setStatus(message, type) {
     refs.statusMessage.textContent = message;
     refs.statusMessage.className = `alert alert-${type} mb-3`;
@@ -49,6 +46,8 @@
   }
 
   function renderRows(buyers) {
+    const tableColumnCount =
+      refs.tableBody?.closest('table')?.querySelectorAll('thead th')?.length || 1;
     refs.tableBody.innerHTML = '';
 
     if (!buyers.length) {
@@ -98,7 +97,7 @@
   async function loadBuyers() {
     setStatus('Carregando compradores...', 'info');
     try {
-      const response = await fetch(`${apiBaseUrl}/compradores?limit=${encodeURIComponent(String(buyersLimit))}`);
+      const response = await fetch(`${apiBaseUrl}/compradores?limit=${buyersLimit}`);
       if (!response.ok) {
         throw new Error('Não foi possível carregar os compradores do tenant.');
       }
