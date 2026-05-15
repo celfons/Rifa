@@ -212,7 +212,7 @@ app.post('/api/rifas/:id/confirmacao', async (c) => {
 
 app.get('/api/rifas/:id/confirmacoes', async (c) => {
   const raffleId = c.req.param('id');
-  const limit = parseConfirmationsLimit(c.req.query('limit'));
+  const limit = parseListLimit(c.req.query('limit'));
 
   const listResult = await listConfirmationsFromD1(c.env, c.get('tenantId'), raffleId, limit);
 
@@ -236,7 +236,7 @@ app.get('/api/rifas/:id/numeros-comprados', async (c) => {
 });
 
 app.get('/api/compradores', async (c) => {
-  const limit = parseConfirmationsLimit(c.req.query('limit'));
+  const limit = parseListLimit(c.req.query('limit'));
   const tenantId = c.get('tenantId');
   const listResult = await listBuyersFromD1(c.env, tenantId, limit);
 
@@ -483,7 +483,7 @@ function normalizePurchasePayload(payload: unknown) {
   };
 }
 
-function parseConfirmationsLimit(value?: string) {
+function parseListLimit(value?: string) {
   if (!value) {
     return DEFAULT_CONFIRMATIONS_LIMIT;
   }

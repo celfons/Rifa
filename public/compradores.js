@@ -10,6 +10,9 @@
     tableBody: document.getElementById('buyersTableBody')
   };
 
+  const tableColumnCount =
+    refs.tableBody?.closest('table')?.querySelectorAll('thead th')?.length || 1;
+
   function setStatus(message, type) {
     refs.statusMessage.textContent = message;
     refs.statusMessage.className = `alert alert-${type} mb-3`;
@@ -51,7 +54,7 @@
     if (!buyers.length) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
-      cell.colSpan = 7;
+      cell.colSpan = tableColumnCount;
       cell.className = 'text-center text-secondary py-4';
       cell.textContent = 'Nenhum comprador encontrado para este tenant.';
       row.appendChild(cell);
