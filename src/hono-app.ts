@@ -43,6 +43,16 @@ type PurchasedNumbersRow = {
   numbers_csv: string;
 };
 
+type BuyerRow = {
+  raffle_id: string;
+  buyer_name: string;
+  buyer_phone: string;
+  numbers_count: number;
+  total_amount: number;
+  payment_status: string;
+  created_at: string;
+};
+
 type Variables = {
   tenantId: string;
 };
@@ -225,6 +235,21 @@ app.get('/api/rifas/:id/numeros-comprados', async (c) => {
   return c.json({ numbers: listResult.numbers });
 });
 
+app.get('/api/compradores', async (c) => {
+  const limit = parseConfirmationsLimit(c.req.query('limit'));
+  const tenantId = c.get('tenantId');
+  const listResult = await listBuyersFromD1(c.env, tenantId, limit);
+
+  if (!listResult.ok) {
+    return c.json({ error: listResult.error }, 502);
+  }
+
+  return c.json({
+    tenantId,
+    buyers: listResult.buyers
+  });
+});
+
 app.get('/health', (c) => c.json({ ok: true }));
 
 const DEFAULT_CONFIRMATIONS_LIMIT = 100;
@@ -355,6 +380,45 @@ async function listPurchasedNumbersFromD1(env: Bindings, tenantId: string, raffl
 
   const numbers = Array.from(numbersSet).sort((a, b) => a - b);
   return { ok: true as const, numbers };
+}
+
+async function listBuyersFromD1(env: Bindings, tenantId: string, limit: number) {
+  if (!env.DB) {
+    return { ok: false, error: 'Binding do D1 (DB) não configurado.' as const };
+  }
+
+  const statement = env.DB.prepare(
+    `SELECT
+      raffle_id,
+      buyer_name,
+      buyer_phone,
+      numbers_count,
+      total_amount,
+      payment_status,
+      created_at
+    FROM rifa_purchases
+    WHERE tenant_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?`
+  );
+
+  const result = await statement.bind(tenantId, limit).all<BuyerRow>();
+
+  if (!result.success) {
+    return { ok: false, error: 'Falha ao buscar compradores no D1.' as const };
+  }
+
+  const buyers = result.results.map((row) => ({
+    raffleId: row.raffle_id || '',
+    name: row.buyer_name || '',
+    phone: row.buyer_phone || '',
+    numbersCount: Number(row.numbers_count || 0),
+    totalAmount: Number(row.total_amount || 0),
+    paymentStatus: row.payment_status || '',
+    createdAt: row.created_at || ''
+  }));
+
+  return { ok: true as const, buyers };
 }
 
 function mapPurchaseRow(row: PurchaseRow) {
