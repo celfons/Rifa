@@ -252,8 +252,8 @@ app.get('/api/compradores', async (c) => {
 
 app.get('/health', (c) => c.json({ ok: true }));
 
-const DEFAULT_CONFIRMATIONS_LIMIT = 100;
-const MAX_CONFIRMATIONS_LIMIT = 500;
+const DEFAULT_LIST_LIMIT = 100;
+const MAX_LIST_LIMIT = 500;
 
 async function saveInD1(env: Bindings, tenantId: string, raffleId: string, payload: unknown) {
   if (!env.DB) {
@@ -485,15 +485,15 @@ function normalizePurchasePayload(payload: unknown) {
 
 function parseListLimit(value?: string) {
   if (!value) {
-    return DEFAULT_CONFIRMATIONS_LIMIT;
+    return DEFAULT_LIST_LIMIT;
   }
 
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1) {
-    return DEFAULT_CONFIRMATIONS_LIMIT;
+    return DEFAULT_LIST_LIMIT;
   }
 
-  const limit = Math.min(Math.floor(parsed), MAX_CONFIRMATIONS_LIMIT);
+  const limit = Math.min(Math.floor(parsed), MAX_LIST_LIMIT);
   return limit;
 }
 
