@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { swaggerUI } from '@hono/swagger-ui';
 
 type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
@@ -58,6 +59,12 @@ type Variables = {
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+app.get('/openapi.json', (c) => {
+  return c.json(buildOpenApiSpec(new URL(c.req.url).origin));
+});
+
+app.get('/swagger', swaggerUI({ url: '/openapi.json' }));
 
 const defaultRifas: Rifa[] = [
   {
@@ -703,6 +710,298 @@ function sanitizeTenantId(value?: string) {
   }
 
   return trimmed;
+}
+
+function buildOpenApiSpec(serverUrl: string) {
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'Rifa API',
+      version: '1.0.0',
+      description: 'Documentação dos endpoints da API de rifa.'
+    },
+    servers: [{ url: serverUrl }],
+    components: {
+      schemas: {
+        Buyer: {
+          type: 'object',
+          required: ['name', 'phone'],
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Nome completo do comprador'
+            },
+            phone: {
+              type: 'string',
+              description: 'Telefone do comprador com DDD'
+            }
+          }
+        },
+        Notification: {
+          type: 'object',
+          properties: {
+            channel: {
+              type: 'string',
+              description: 'Canal de notificação usado (ex.: webhook, none)'
+            },
+            status: {
+              type: 'string',
+              description: 'Status da notificação (ex.: sent, skipped, failed)'
+            }
+          }
+        }
+      }
+    },
+    paths: {
+      '/health': {
+        get: {
+          summary: 'Health check',
+          responses: {
+            '200': {
+              description: 'Serviço ativo'
+            }
+          }
+        }
+      },
+      '/api/rifas': {
+        get: {
+          summary: 'Lista rifas disponíveis',
+          responses: {
+            '200': {
+              description: 'Rifas disponíveis'
+            }
+          }
+        }
+      },
+      '/api/config': {
+        get: {
+          summary: 'Retorna configuração pública por tenant',
+          responses: {
+            '200': {
+              description: 'Configuração pública carregada'
+            }
+          }
+        }
+      },
+      '/api/pagamentos/preferencia': {
+        post: {
+          summary: 'Cria preferência no Mercado Pago',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['numbers', 'raffleId', 'ticketPrice'],
+                  properties: {
+                    numbers: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Números selecionados da rifa'
+                    },
+                    raffleId: {
+                      type: 'string',
+                      description: 'Identificador da rifa'
+                    },
+                    ticketPrice: {
+                      type: 'number',
+                      description: 'Preço unitário do bilhete'
+                    },
+                    buyer: {
+                      $ref: '#/components/schemas/Buyer'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Preferência criada'
+            },
+            '400': {
+              description: 'Payload inválido'
+            },
+            '500': {
+              description: 'Token ausente'
+            },
+            '502': {
+              description: 'Erro no Mercado Pago'
+            }
+          }
+        }
+      },
+      '/api/pagamentos/status': {
+        get: {
+          summary: 'Consulta status de pagamento',
+          parameters: [
+            {
+              name: 'preferenceId',
+              in: 'query',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Status retornado'
+            },
+            '400': {
+              description: 'Parâmetros ausentes'
+            },
+            '502': {
+              description: 'Erro ao consultar status'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/confirmacao': {
+        post: {
+          summary: 'Salva confirmação de pagamento',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['buyer', 'numbers', 'ticketPrice', 'totalAmount'],
+                  properties: {
+                    buyer: {
+                      $ref: '#/components/schemas/Buyer'
+                    },
+                    numbers: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Números da rifa confirmados na compra'
+                    },
+                    numbersCount: {
+                      type: 'integer',
+                      description:
+                        'Quantidade de números selecionados na compra (opcional, pode ser inferida pelo tamanho de `numbers`)'
+                    },
+                    ticketPrice: {
+                      type: 'number',
+                      description: 'Preço unitário do número da rifa'
+                    },
+                    totalAmount: {
+                      type: 'number',
+                      description: 'Valor total da compra para os números selecionados'
+                    },
+                    preferenceId: {
+                      type: 'string',
+                      description: 'Identificador da preferência no Mercado Pago'
+                    },
+                    paymentId: {
+                      type: 'string',
+                      description: 'Identificador do pagamento no Mercado Pago'
+                    },
+                    paymentStatus: {
+                      type: 'string',
+                      description: 'Status atual do pagamento'
+                    },
+                    notification: {
+                      $ref: '#/components/schemas/Notification'
+                    },
+                    createdAt: {
+                      type: 'string',
+                      format: 'date-time'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Confirmação salva'
+            },
+            '502': {
+              description: 'Falha ao persistir confirmação'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/confirmacoes': {
+        get: {
+          summary: 'Lista confirmações da rifa',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              description: 'Limite de registros retornados (máximo 500)',
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Confirmações retornadas'
+            },
+            '502': {
+              description: 'Falha ao listar confirmações'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/numeros-comprados': {
+        get: {
+          summary: 'Lista números comprados da rifa',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Números retornados'
+            },
+            '502': {
+              description: 'Falha ao listar números'
+            }
+          }
+        }
+      },
+      '/api/compradores': {
+        get: {
+          summary: 'Lista compradores do tenant atual',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              description: 'Limite de registros retornados (máximo 500)',
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Compradores retornados'
+            },
+            '502': {
+              description: 'Falha ao listar compradores'
+            }
+          }
+        }
+      }
+    }
+  };
 }
 
 export default app;
