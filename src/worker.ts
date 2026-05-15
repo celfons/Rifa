@@ -4,7 +4,12 @@ type Bindings = {
   ASSETS?: Fetcher;
 };
 
-const apiLikePath = (pathname: string) => pathname.startsWith('/api/') || pathname === '/api' || pathname === '/health';
+const apiLikePath = (pathname: string) =>
+  pathname.startsWith('/api/') ||
+  pathname === '/api' ||
+  pathname === '/health' ||
+  pathname === '/swagger' ||
+  pathname === '/openapi.json';
 
 export default {
   async fetch(request: Request, env: Bindings, ctx: ExecutionContext): Promise<Response> {
