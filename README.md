@@ -8,6 +8,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - Pagamento com SDK client do Mercado Pago
 - APIs da rifa publicadas no backend Hono
 - Registro pós-confirmação no Cloudflare D1 via API backend
+- Confirmação assíncrona de PIX via webhook do Mercado Pago
 
 ## Estrutura
 - Front-end: `public/index.html`, `public/styles.css`, `public/app.js`, `public/config.example.js`
@@ -23,6 +24,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `GET /api/config` → retorna configuração pública por tenant (ex.: chave pública do Mercado Pago)
 - `POST /api/pagamentos/preferencia` → cria preferência no Mercado Pago
 - `GET /api/pagamentos/status?preferenceId=...` → consulta status de pagamento
+- `POST /api/pagamentos/webhook` → recebe notificações assíncronas do Mercado Pago e registra compra aprovada
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
 - `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
 - `GET /api/rifas/:id/numeros-comprados` → lista números comprados da rifa
@@ -40,6 +42,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 Defina no Worker/Pages:
 - `MERCADO_PAGO_ACCESS_TOKEN` (string ou JSON por tenant)
 - `MERCADO_PAGO_PUBLIC_KEY` (string ou JSON por tenant; usado pelo endpoint `GET /api/config`)
+- `WEBHOOK_BASE_URL` (opcional; origem pública fixa usada para montar a URL de webhook em produção)
 - `RIFAS_JSON` (opcional, JSON com rifas; pode ser global ou por tenant)
 - `TENANT_ROOT_DOMAIN` (ex.: `example.com`, habilita multi-tenant por subdomínio)
 - `TENANT_DEFAULT_ID` (opcional, padrão: `default`)
