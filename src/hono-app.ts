@@ -138,6 +138,7 @@ app.post('/api/pagamentos/preferencia', async (c) => {
       pending: returnBaseUrl,
       failure: returnBaseUrl
     },
+    notification_url: resolveWebhookUrl(c.req.url),
     auto_return: 'approved',
     metadata: {
       raffleId,
@@ -204,6 +205,76 @@ app.get('/api/pagamentos/status', async (c) => {
   });
 });
 
+app.post('/api/pagamentos/webhook', async (c) => {
+  const accessToken = resolveMercadoPagoAccessToken(c.env.MERCADO_PAGO_ACCESS_TOKEN, c.get('tenantId'));
+
+  if (!accessToken) {
+    return c.json({ error: 'MERCADO_PAGO_ACCESS_TOKEN não configurado.' }, 500);
+  }
+
+  const payload = await readJsonBodySafe(c.req);
+  const paymentId = resolveWebhookPaymentId(c.req.url, payload);
+
+  if (!paymentId) {
+    return c.json({ received: true, ignored: true });
+  }
+
+  const paymentResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (!paymentResponse.ok) {
+    return c.json({ error: 'Falha ao consultar pagamento do webhook.' }, 502);
+  }
+
+  const paymentData = await paymentResponse.json<Record<string, unknown>>();
+  const paymentStatus = String(paymentData.status || 'pending');
+  if (paymentStatus !== 'approved') {
+    return c.json({ received: true, ignored: true, paymentStatus });
+  }
+
+  const metadata = getRecordValue(paymentData, 'metadata');
+  const raffleId = firstDefinedString(
+    toNonEmptyString(metadata?.raffleId),
+    toNonEmptyString(metadata?.raffle_id),
+    resolveRaffleIdFromPayment(paymentData)
+  );
+  const numbers = resolvePaymentNumbers(metadata);
+  const buyerData = getRecordValue(metadata, 'buyer');
+
+  if (!raffleId || !numbers.length) {
+    return c.json({ error: 'Webhook sem metadata suficiente para registrar compra.' }, 422);
+  }
+
+  const ticketPrice = Number(paymentData.transaction_amount || 0) / numbers.length;
+  const confirmationPayload = {
+    buyer: {
+      name: String(buyerData?.name || ''),
+      phone: String(buyerData?.phone || '')
+    },
+    numbers,
+    ticketPrice: Number.isFinite(ticketPrice) ? ticketPrice : 0,
+    totalAmount: Number(paymentData.transaction_amount || 0),
+    preferenceId: String(paymentData.preference_id || ''),
+    paymentId: String(paymentData.id || paymentId),
+    paymentStatus,
+    createdAt: String(paymentData.date_approved || paymentData.date_created || new Date().toISOString()),
+    notification: {
+      channel: 'webhook',
+      status: 'received'
+    }
+  };
+
+  const saveResult = await saveInD1(c.env, c.get('tenantId'), raffleId, confirmationPayload);
+  if (!saveResult.ok) {
+    return c.json({ error: saveResult.error }, 502);
+  }
+
+  return c.json({ success: true, duplicated: saveResult.duplicated || false });
+});
+
 app.post('/api/rifas/:id/confirmacao', async (c) => {
   const raffleId = c.req.param('id');
   const payload = await c.req.json();
@@ -268,6 +339,11 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
   }
 
   const purchase = normalizePurchasePayload(payload);
+  const existing = await findExistingPurchase(env.DB, tenantId, purchase.preferenceId, purchase.paymentId);
+  if (existing) {
+    return { ok: true as const, duplicated: true as const };
+  }
+
   const statement = env.DB.prepare(
     `INSERT INTO rifa_purchases (
       tenant_id,
@@ -313,6 +389,42 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
   }
 
   return { ok: true as const };
+}
+
+async function findExistingPurchase(db: D1Database, tenantId: string, preferenceId: string, paymentId: string) {
+  if (paymentId) {
+    const byPayment = await db
+      .prepare(
+        `SELECT id
+        FROM rifa_purchases
+        WHERE tenant_id = ?
+          AND payment_id = ?
+        LIMIT 1`
+      )
+      .bind(tenantId, paymentId)
+      .first<{ id: number }>();
+    if (byPayment?.id) {
+      return true;
+    }
+  }
+
+  if (preferenceId) {
+    const byPreference = await db
+      .prepare(
+        `SELECT id
+        FROM rifa_purchases
+        WHERE tenant_id = ?
+          AND preference_id = ?
+        LIMIT 1`
+      )
+      .bind(tenantId, preferenceId)
+      .first<{ id: number }>();
+    if (byPreference?.id) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function listConfirmationsFromD1(env: Bindings, tenantId: string, raffleId: string, limit: number) {
@@ -527,6 +639,126 @@ function resolveReturnBaseUrl(requestUrl: string, originHeader?: string, referer
   }
 
   return new URL(requestUrl).origin;
+}
+
+function resolveWebhookUrl(requestUrl: string) {
+  return `${new URL(requestUrl).origin}/api/pagamentos/webhook`;
+}
+
+async function readJsonBodySafe(request: { json: () => Promise<unknown> }) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+function resolveWebhookPaymentId(requestUrl: string, payload: unknown) {
+  const url = new URL(requestUrl);
+  const queryId = firstDefinedString(
+    url.searchParams.get('data.id'),
+    url.searchParams.get('id'),
+    url.searchParams.get('resource.id')
+  );
+  if (queryId) {
+    return queryId;
+  }
+
+  const body = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+  const data = getRecordValue(body, 'data');
+
+  const bodyId = firstDefinedString(
+    toNonEmptyString(data?.id),
+    toNonEmptyString(body.id),
+    extractIdFromResource(toNonEmptyString(body.resource)),
+    extractIdFromResource(toNonEmptyString(data?.resource))
+  );
+
+  return bodyId || '';
+}
+
+function getRecordValue(value: unknown, key: string) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const candidate = record[key];
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return null;
+  }
+
+  return candidate as Record<string, unknown>;
+}
+
+function getArrayValue(value: unknown, key: string) {
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record[key]) ? record[key] : [];
+}
+
+function normalizeNumbers(values: unknown[]) {
+  return values.map((item) => String(item).trim()).filter(Boolean);
+}
+
+function resolvePaymentNumbers(metadata: Record<string, unknown> | null) {
+  const arrayNumbers = normalizeNumbers(getArrayValue(metadata, 'numbers'));
+  if (arrayNumbers.length) {
+    return arrayNumbers;
+  }
+
+  const numbersCsv = toNonEmptyString(metadata?.numbers_csv);
+  if (!numbersCsv) {
+    return [];
+  }
+
+  return numbersCsv
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function resolveRaffleIdFromPayment(paymentData: Record<string, unknown>) {
+  const additionalInfo = getRecordValue(paymentData, 'additional_info');
+  const items = Array.isArray(additionalInfo?.items) ? additionalInfo.items : [];
+  const firstItem = items[0];
+
+  if (!firstItem || typeof firstItem !== 'object' || Array.isArray(firstItem)) {
+    return '';
+  }
+
+  return toNonEmptyString((firstItem as Record<string, unknown>).id);
+}
+
+function toNonEmptyString(value: unknown) {
+  const normalized = String(value || '').trim();
+  return normalized || '';
+}
+
+function firstDefinedString(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    if (value && value.trim()) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function extractIdFromResource(value: string) {
+  if (!value) {
+    return '';
+  }
+
+  try {
+    const resourceUrl = new URL(value);
+    const segments = resourceUrl.pathname.split('/').filter(Boolean);
+    return segments[segments.length - 1] || '';
+  } catch {
+    return '';
+  }
 }
 
 function parseRifas(value: string | undefined, tenantId: string): Rifa[] {
@@ -851,6 +1083,25 @@ function buildOpenApiSpec(serverUrl: string) {
             },
             '502': {
               description: 'Erro ao consultar status'
+            }
+          }
+        }
+      },
+      '/api/pagamentos/webhook': {
+        post: {
+          summary: 'Recebe webhook assíncrono do Mercado Pago',
+          responses: {
+            '200': {
+              description: 'Webhook processado'
+            },
+            '422': {
+              description: 'Webhook sem dados suficientes para registro'
+            },
+            '500': {
+              description: 'Token ausente'
+            },
+            '502': {
+              description: 'Falha ao consultar pagamento no Mercado Pago'
             }
           }
         }
