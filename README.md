@@ -42,6 +42,7 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 Defina no Worker/Pages:
 - `MERCADO_PAGO_ACCESS_TOKEN` (string ou JSON por tenant)
 - `MERCADO_PAGO_PUBLIC_KEY` (string ou JSON por tenant; usado pelo endpoint `GET /api/config`)
+- `WEBHOOK_BASE_URL` (opcional; origem pública fixa usada para montar a URL de webhook em produção)
 - `RIFAS_JSON` (opcional, JSON com rifas; pode ser global ou por tenant)
 - `TENANT_ROOT_DOMAIN` (ex.: `example.com`, habilita multi-tenant por subdomínio)
 - `TENANT_DEFAULT_ID` (opcional, padrão: `default`)

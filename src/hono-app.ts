@@ -4,6 +4,7 @@ import { swaggerUI } from '@hono/swagger-ui';
 type Bindings = {
   MERCADO_PAGO_ACCESS_TOKEN?: string;
   MERCADO_PAGO_PUBLIC_KEY?: string;
+  WEBHOOK_BASE_URL?: string;
   RIFAS_JSON?: string;
   DB?: D1Database;
   TENANT_ENABLED?: string;
@@ -138,7 +139,7 @@ app.post('/api/pagamentos/preferencia', async (c) => {
       pending: returnBaseUrl,
       failure: returnBaseUrl
     },
-    notification_url: resolveWebhookUrl(c.req.url),
+    notification_url: resolveWebhookUrl(c.req.url, c.env.WEBHOOK_BASE_URL),
     auto_return: 'approved',
     metadata: {
       raffleId,
@@ -237,8 +238,8 @@ app.post('/api/pagamentos/webhook', async (c) => {
 
   const metadata = getRecordValue(paymentData, 'metadata');
   const raffleId = firstDefinedString(
-    toNonEmptyString(metadata?.raffleId),
-    toNonEmptyString(metadata?.raffle_id),
+    toTrimmedString(metadata?.raffleId),
+    toTrimmedString(metadata?.raffle_id),
     resolveRaffleIdFromPayment(paymentData)
   );
   const numbers = resolvePaymentNumbers(metadata);
@@ -393,8 +394,23 @@ async function saveInD1(env: Bindings, tenantId: string, raffleId: string, paylo
 }
 
 async function findExistingPurchase(db: D1Database, tenantId: string, preferenceId: string, paymentId: string) {
-  if (paymentId) {
-    const byPayment = await db
+  if (!paymentId && !preferenceId) {
+    return false;
+  }
+
+  let query;
+  if (paymentId && preferenceId) {
+    query = db
+      .prepare(
+        `SELECT id
+        FROM rifa_purchases
+        WHERE tenant_id = ?
+          AND (payment_id = ? OR preference_id = ?)
+        LIMIT 1`
+      )
+      .bind(tenantId, paymentId, preferenceId);
+  } else if (paymentId) {
+    query = db
       .prepare(
         `SELECT id
         FROM rifa_purchases
@@ -402,15 +418,9 @@ async function findExistingPurchase(db: D1Database, tenantId: string, preference
           AND payment_id = ?
         LIMIT 1`
       )
-      .bind(tenantId, paymentId)
-      .first<{ id: number }>();
-    if (byPayment?.id) {
-      return true;
-    }
-  }
-
-  if (preferenceId) {
-    const byPreference = await db
+      .bind(tenantId, paymentId);
+  } else {
+    query = db
       .prepare(
         `SELECT id
         FROM rifa_purchases
@@ -418,14 +428,11 @@ async function findExistingPurchase(db: D1Database, tenantId: string, preference
           AND preference_id = ?
         LIMIT 1`
       )
-      .bind(tenantId, preferenceId)
-      .first<{ id: number }>();
-    if (byPreference?.id) {
-      return true;
-    }
+      .bind(tenantId, preferenceId);
   }
 
-  return false;
+  const existing = await query.first<{ id: number }>();
+  return Boolean(existing?.id);
 }
 
 async function listConfirmationsFromD1(env: Bindings, tenantId: string, raffleId: string, limit: number) {
@@ -642,7 +649,16 @@ function resolveReturnBaseUrl(requestUrl: string, originHeader?: string, referer
   return new URL(requestUrl).origin;
 }
 
-function resolveWebhookUrl(requestUrl: string) {
+function resolveWebhookUrl(requestUrl: string, configuredBaseUrl?: string) {
+  const candidate = configuredBaseUrl?.trim();
+  if (candidate) {
+    try {
+      return `${new URL(candidate).origin}/api/pagamentos/webhook`;
+    } catch {
+      // fallback para requestUrl
+    }
+  }
+
   return `${new URL(requestUrl).origin}/api/pagamentos/webhook`;
 }
 
@@ -669,10 +685,10 @@ function resolveWebhookPaymentId(requestUrl: string, payload: unknown) {
   const data = getRecordValue(body, 'data');
 
   const bodyId = firstDefinedString(
-    toNonEmptyString(data?.id),
-    toNonEmptyString(body.id),
-    extractIdFromResource(toNonEmptyString(body.resource)),
-    extractIdFromResource(toNonEmptyString(data?.resource))
+    toTrimmedString(data?.id),
+    toTrimmedString(body.id),
+    extractIdFromResource(toTrimmedString(body.resource)),
+    extractIdFromResource(toTrimmedString(data?.resource))
   );
 
   return bodyId || '';
@@ -701,17 +717,17 @@ function getArrayValue(value: unknown, key: string) {
   return Array.isArray(record[key]) ? record[key] : [];
 }
 
-function normalizeNumbers(values: unknown[]) {
+function normalizeNumberStrings(values: unknown[]) {
   return values.map((item) => String(item).trim()).filter(Boolean);
 }
 
 function resolvePaymentNumbers(metadata: Record<string, unknown> | null) {
-  const arrayNumbers = normalizeNumbers(getArrayValue(metadata, 'numbers'));
+  const arrayNumbers = normalizeNumberStrings(getArrayValue(metadata, 'numbers'));
   if (arrayNumbers.length) {
     return arrayNumbers;
   }
 
-  const numbersCsv = toNonEmptyString(metadata?.numbers_csv);
+  const numbersCsv = toTrimmedString(metadata?.numbers_csv);
   if (!numbersCsv) {
     return [];
   }
@@ -731,10 +747,10 @@ function resolveRaffleIdFromPayment(paymentData: Record<string, unknown>) {
     return '';
   }
 
-  return toNonEmptyString((firstItem as Record<string, unknown>).id);
+  return toTrimmedString((firstItem as Record<string, unknown>).id);
 }
 
-function toNonEmptyString(value: unknown) {
+function toTrimmedString(value: unknown) {
   const normalized = String(value || '').trim();
   return normalized;
 }
