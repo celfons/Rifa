@@ -19,7 +19,7 @@ INSERT INTO rifa_purchases (
     'default',
     'rifa-principal',
     'Eliana',
-    'não informado',
+    '',
     '43,97',
     2,
     10,
@@ -29,14 +29,14 @@ INSERT INTO rifa_purchases (
     'approved',
     'manual_migration',
     'recorded',
-    datetime('now'),
+    '2026-05-17T14:16:57.049Z',
     '{"source":"manual_migration","reason":"pix_missing_registration","migration":"0004","buyer":"Eliana"}'
   ),
   (
     'default',
     'rifa-principal',
     'Adriana',
-    'não informado',
+    '',
     '12,27,47,119,212',
     5,
     10,
@@ -46,14 +46,14 @@ INSERT INTO rifa_purchases (
     'approved',
     'manual_migration',
     'recorded',
-    datetime('now'),
+    '2026-05-17T14:16:57.049Z',
     '{"source":"manual_migration","reason":"pix_missing_registration","migration":"0004","buyer":"Adriana"}'
   ),
   (
     'default',
     'rifa-principal',
     'Lu',
-    'não informado',
+    '',
     '19,62,93,497',
     4,
     10,
@@ -63,6 +63,6 @@ INSERT INTO rifa_purchases (
     'approved',
     'manual_migration',
     'recorded',
-    datetime('now'),
+    '2026-05-17T14:16:57.049Z',
     '{"source":"manual_migration","reason":"pix_missing_registration","migration":"0004","buyer":"Lu"}'
   );
