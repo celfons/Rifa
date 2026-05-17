@@ -248,7 +248,8 @@ app.post('/api/pagamentos/webhook', async (c) => {
     return c.json({ error: 'Webhook sem metadata suficiente para registrar compra.' }, 422);
   }
 
-  const ticketPrice = Number(paymentData.transaction_amount || 0) / numbers.length;
+  const totalAmount = Number(paymentData.transaction_amount || 0);
+  const ticketPrice = numbers.length > 0 ? totalAmount / numbers.length : 0;
   const confirmationPayload = {
     buyer: {
       name: String(buyerData?.name || ''),
@@ -256,7 +257,7 @@ app.post('/api/pagamentos/webhook', async (c) => {
     },
     numbers,
     ticketPrice: Number.isFinite(ticketPrice) ? ticketPrice : 0,
-    totalAmount: Number(paymentData.transaction_amount || 0),
+    totalAmount: Number.isFinite(totalAmount) ? totalAmount : 0,
     preferenceId: String(paymentData.preference_id || ''),
     paymentId: String(paymentData.id || paymentId),
     paymentStatus,
@@ -684,7 +685,7 @@ function getRecordValue(value: unknown, key: string) {
 
   const record = value as Record<string, unknown>;
   const candidate = record[key];
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+  if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate)) {
     return null;
   }
 
@@ -735,7 +736,7 @@ function resolveRaffleIdFromPayment(paymentData: Record<string, unknown>) {
 
 function toNonEmptyString(value: unknown) {
   const normalized = String(value || '').trim();
-  return normalized || '';
+  return normalized;
 }
 
 function firstDefinedString(...values: Array<string | null | undefined>) {
