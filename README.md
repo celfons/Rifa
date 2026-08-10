@@ -28,6 +28,8 @@ Site de rifa responsivo com Bootstrap + JavaScript e backend em **Hono** pronto 
 - `POST /api/rifas/:id/confirmacao` → recebe dados pós-confirmação e salva no D1
 - `GET /api/rifas/:id/confirmacoes?limit=100` → lista confirmações salvas no D1
 - `GET /api/rifas/:id/numeros-comprados` → lista números comprados da rifa
+- `POST /api/rifas/:id/sorteio` → sorteia um número vencedor entre os números comprados; o sorteio é persistido no D1 e só pode ser gerado uma vez por rifa/tenant (chamadas subsequentes retornam o mesmo resultado)
+- `GET /api/rifas/:id/sorteio` → consulta o resultado do sorteio já realizado (`draw: null` se ainda não houver sorteio)
 - `GET /api/compradores?limit=100` → lista compradores do tenant atual (Cloudflare D1)
 
 ## Configuração do front-end

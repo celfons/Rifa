@@ -45,6 +45,21 @@
           <div class="col-xl-5">
             <section class="card border-0 shadow-sm mb-4">
               <div class="card-body p-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                  <h2 class="h4 mb-0">Sorteio</h2>
+                </div>
+                <p class="text-secondary small mb-3">
+                  Sorteia um número vencedor entre os números já comprados. O sorteio só pode ser realizado uma vez por rifa.
+                </p>
+                <button id="drawButton" type="button" class="btn btn-warning w-100 py-2">
+                  Realizar sorteio
+                </button>
+                <div id="drawResult" class="alert alert-success mt-3 d-none" role="alert"></div>
+              </div>
+            </section>
+
+            <section class="card border-0 shadow-sm mb-4">
+              <div class="card-body p-4">
                 <h2 class="h4 mb-3">2. Dados para registro</h2>
                 <form id="buyerForm" novalidate>
                   <div class="row g-3">

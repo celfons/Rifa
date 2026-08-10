@@ -45,6 +45,20 @@ type PurchasedNumbersRow = {
   numbers_csv: string;
 };
 
+type TicketRow = {
+  buyer_name: string;
+  buyer_phone: string;
+  numbers_csv: string;
+};
+
+type DrawRow = {
+  raffle_id: string;
+  winning_number: number;
+  buyer_name: string | null;
+  buyer_phone: string | null;
+  drawn_at: string;
+};
+
 type BuyerRow = {
   raffle_id: string;
   buyer_name: string;
@@ -315,6 +329,30 @@ app.get('/api/rifas/:id/numeros-comprados', async (c) => {
   return c.json({ numbers: listResult.numbers });
 });
 
+app.post('/api/rifas/:id/sorteio', async (c) => {
+  const raffleId = c.req.param('id');
+  const tenantId = c.get('tenantId');
+
+  const result = await drawRaffleWinner(c.env, tenantId, raffleId);
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  return c.json({ draw: result.draw, alreadyDrawn: result.alreadyDrawn });
+});
+
+app.get('/api/rifas/:id/sorteio', async (c) => {
+  const raffleId = c.req.param('id');
+  const tenantId = c.get('tenantId');
+
+  const result = await getExistingDraw(c.env, tenantId, raffleId);
+  if (!result.ok) {
+    return c.json({ error: result.error }, 502);
+  }
+
+  return c.json({ draw: result.draw });
+});
+
 app.get('/api/compradores', async (c) => {
   const limit = parseListLimit(c.req.query('limit'));
   const tenantId = c.get('tenantId');
@@ -507,6 +545,103 @@ async function listPurchasedNumbersFromD1(env: Bindings, tenantId: string, raffl
 
   const numbers = Array.from(numbersSet).sort((a, b) => a - b);
   return { ok: true as const, numbers };
+}
+
+async function drawRaffleWinner(env: Bindings, tenantId: string, raffleId: string) {
+  if (!env.DB) {
+    return { ok: false as const, error: 'Binding do D1 (DB) não configurado.', status: 502 as const };
+  }
+
+  const existing = await getExistingDraw(env, tenantId, raffleId);
+  if (!existing.ok) {
+    return { ok: false as const, error: existing.error, status: 502 as const };
+  }
+  if (existing.draw) {
+    return { ok: true as const, draw: existing.draw, alreadyDrawn: true };
+  }
+
+  const purchasesResult = await env.DB.prepare(
+    `SELECT buyer_name, buyer_phone, numbers_csv
+    FROM rifa_purchases
+    WHERE tenant_id = ?
+      AND raffle_id = ?`
+  )
+    .bind(tenantId, raffleId)
+    .all<TicketRow>();
+
+  if (!purchasesResult.success) {
+    return { ok: false as const, error: 'Falha ao buscar números comprados no D1.', status: 502 as const };
+  }
+
+  const tickets: Array<{ number: number; buyerName: string; buyerPhone: string }> = [];
+  purchasesResult.results.forEach((row) => {
+    parseNumbersCsv(row.numbers_csv || '').forEach((value) => {
+      const parsed = Number(value);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        tickets.push({ number: parsed, buyerName: row.buyer_name || '', buyerPhone: row.buyer_phone || '' });
+      }
+    });
+  });
+
+  if (!tickets.length) {
+    return { ok: false as const, error: 'Nenhum número comprado para sortear.', status: 422 as const };
+  }
+
+  const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % tickets.length;
+  const winner = tickets[randomIndex];
+  const drawnAt = new Date().toISOString();
+
+  const insertResult = await env.DB.prepare(
+    `INSERT INTO rifa_draws (raffle_id, tenant_id, winning_number, buyer_name, buyer_phone, drawn_at)
+    SELECT ?, ?, ?, ?, ?, ?
+    WHERE NOT EXISTS (
+      SELECT 1 FROM rifa_draws WHERE raffle_id = ? AND tenant_id = ?
+    )`
+  )
+    .bind(raffleId, tenantId, winner.number, winner.buyerName, winner.buyerPhone, drawnAt, raffleId, tenantId)
+    .run();
+
+  if (!insertResult.success) {
+    return { ok: false as const, error: 'Falha ao salvar resultado do sorteio no D1.', status: 502 as const };
+  }
+
+  const persisted = await getExistingDraw(env, tenantId, raffleId);
+  if (!persisted.ok || !persisted.draw) {
+    return { ok: false as const, error: 'Falha ao recuperar resultado do sorteio no D1.', status: 502 as const };
+  }
+
+  const alreadyDrawn = (insertResult.meta.changes || 0) === 0;
+  return { ok: true as const, draw: persisted.draw, alreadyDrawn };
+}
+
+async function getExistingDraw(env: Bindings, tenantId: string, raffleId: string) {
+  if (!env.DB) {
+    return { ok: false as const, error: 'Binding do D1 (DB) não configurado.' };
+  }
+
+  const row = await env.DB.prepare(
+    `SELECT raffle_id, winning_number, buyer_name, buyer_phone, drawn_at
+    FROM rifa_draws
+    WHERE tenant_id = ?
+      AND raffle_id = ?
+    LIMIT 1`
+  )
+    .bind(tenantId, raffleId)
+    .first<DrawRow>();
+
+  if (!row) {
+    return { ok: true as const, draw: null };
+  }
+
+  return {
+    ok: true as const,
+    draw: {
+      raffleId: row.raffle_id,
+      winningNumber: Number(row.winning_number),
+      buyer: { name: row.buyer_name || '', phone: row.buyer_phone || '' },
+      drawnAt: row.drawn_at
+    }
+  };
 }
 
 async function listBuyersFromD1(env: Bindings, tenantId: string, limit: number) {
@@ -1242,6 +1377,49 @@ function buildOpenApiSpec(serverUrl: string) {
             },
             '502': {
               description: 'Falha ao listar números'
+            }
+          }
+        }
+      },
+      '/api/rifas/{id}/sorteio': {
+        post: {
+          summary: 'Realiza o sorteio entre os números comprados (somente uma vez por rifa)',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Resultado do sorteio (recém-gerado ou já existente)'
+            },
+            '422': {
+              description: 'Nenhum número comprado para sortear'
+            },
+            '502': {
+              description: 'Falha ao realizar ou persistir o sorteio'
+            }
+          }
+        },
+        get: {
+          summary: 'Consulta o resultado do sorteio já realizado, se existir',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' }
+            }
+          ],
+          responses: {
+            '200': {
+              description: 'Resultado do sorteio ou null se ainda não realizado'
+            },
+            '502': {
+              description: 'Falha ao consultar o sorteio'
             }
           }
         }

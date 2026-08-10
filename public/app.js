@@ -23,7 +23,9 @@
     form: document.getElementById('buyerForm'),
     payButton: document.getElementById('payButton'),
     confirmButton: document.getElementById('confirmButton'),
-    statusMessage: document.getElementById('statusMessage')
+    statusMessage: document.getElementById('statusMessage'),
+    drawButton: document.getElementById('drawButton'),
+    drawResult: document.getElementById('drawResult')
   };
 
   let pendingPurchase = null;
@@ -98,6 +100,12 @@
   refs.confirmButton.addEventListener('click', () => {
     void confirmPendingPurchase();
   });
+
+  if (refs.drawButton) {
+    refs.drawButton.addEventListener('click', () => {
+      void performDraw();
+    });
+  }
 
   async function confirmPendingPurchase({ auto = false } = {}) {
     if (!pendingPurchase) {
@@ -289,6 +297,7 @@
     await loadPurchasedNumbers();
     renderNumbersGrid();
     renderSummary();
+    await loadExistingDraw();
   }
 
   function renderRaffleInfo() {
@@ -421,6 +430,67 @@
         button.removeAttribute('aria-disabled');
       }
     });
+  }
+
+  async function loadExistingDraw() {
+    if (!refs.drawButton) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/sorteio`);
+      if (!response.ok) {
+        return;
+      }
+      const { draw } = await response.json();
+      if (draw) {
+        renderDraw(draw);
+      }
+    } catch (error) {
+      console.warn('Não foi possível carregar o resultado do sorteio.', error);
+    }
+  }
+
+  async function performDraw() {
+    if (!refs.drawButton) {
+      return;
+    }
+
+    refs.drawButton.disabled = true;
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/rifas/${encodeURIComponent(raffle.id)}/sorteio`, {
+        method: 'POST'
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = (data && data.error) || 'Não foi possível realizar o sorteio.';
+        setStatus(message, 'danger');
+        refs.drawButton.disabled = false;
+        return;
+      }
+
+      renderDraw(data.draw);
+    } catch (error) {
+      setStatus(error.message || 'Erro ao realizar o sorteio.', 'danger');
+      refs.drawButton.disabled = false;
+    }
+  }
+
+  function renderDraw(draw) {
+    if (!draw || !refs.drawResult) {
+      return;
+    }
+
+    const number = String(draw.winningNumber).padStart(2, '0');
+    const buyerName = draw.buyer && draw.buyer.name ? draw.buyer.name : 'Não identificado';
+
+    refs.drawResult.textContent = `Número sorteado: ${number} — Ganhador(a): ${buyerName}`;
+    refs.drawResult.classList.remove('d-none');
+    refs.drawButton.disabled = true;
+    refs.drawButton.textContent = 'Sorteio já realizado';
   }
 
   function toBRL(value) {
