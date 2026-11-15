@@ -153,11 +153,12 @@ app.post('/api/pagamentos/preferencia', async (c) => {
       pending: returnBaseUrl,
       failure: returnBaseUrl
     },
-    notification_url: resolveWebhookUrl(c.req.url, c.env.WEBHOOK_BASE_URL),
+    notification_url: resolveWebhookUrl(c.req.url, c.env.WEBHOOK_BASE_URL, c.get('tenantId')),
     auto_return: 'approved',
     metadata: {
       raffleId,
       numbers,
+      tenantId: c.get('tenantId'),
       buyer: body.buyer || null
     }
   };
@@ -221,7 +222,10 @@ app.get('/api/pagamentos/status', async (c) => {
 });
 
 app.post('/api/pagamentos/webhook', async (c) => {
-  const accessToken = resolveMercadoPagoAccessToken(c.env.MERCADO_PAGO_ACCESS_TOKEN, c.get('tenantId'));
+  // O Mercado Pago chama a notification_url, que pode estar num host sem subdomínio
+  // (WEBHOOK_BASE_URL). O tenant vem no parâmetro ?tenant= gravado na criação da preferência.
+  const tenantId = sanitizeTenantId(new URL(c.req.url).searchParams.get('tenant') || '') || c.get('tenantId');
+  const accessToken = resolveMercadoPagoAccessToken(c.env.MERCADO_PAGO_ACCESS_TOKEN, tenantId);
 
   if (!accessToken) {
     return c.json({ error: 'MERCADO_PAGO_ACCESS_TOKEN não configurado.' }, 500);
@@ -283,7 +287,7 @@ app.post('/api/pagamentos/webhook', async (c) => {
     }
   };
 
-  const saveResult = await saveInD1(c.env, c.get('tenantId'), raffleId, confirmationPayload);
+  const saveResult = await saveInD1(c.env, tenantId, raffleId, confirmationPayload);
   if (!saveResult.ok) {
     return c.json({ error: saveResult.error }, 502);
   }
@@ -784,17 +788,22 @@ function resolveReturnBaseUrl(requestUrl: string, originHeader?: string, referer
   return new URL(requestUrl).origin;
 }
 
-function resolveWebhookUrl(requestUrl: string, configuredBaseUrl?: string) {
+function resolveWebhookUrl(requestUrl: string, configuredBaseUrl?: string, tenantId?: string) {
+  let origin = new URL(requestUrl).origin;
   const candidate = configuredBaseUrl?.trim();
   if (candidate) {
     try {
-      return `${new URL(candidate).origin}/api/pagamentos/webhook`;
+      origin = new URL(candidate).origin;
     } catch {
       // fallback para requestUrl
     }
   }
 
-  return `${new URL(requestUrl).origin}/api/pagamentos/webhook`;
+  const url = new URL(`${origin}/api/pagamentos/webhook`);
+  if (tenantId) {
+    url.searchParams.set('tenant', tenantId);
+  }
+  return url.toString();
 }
 
 async function readJsonBodySafe(request: { json: () => Promise<unknown> }) {
