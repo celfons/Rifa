@@ -13,6 +13,7 @@ type Bindings = {
   TENANT_MAP_JSON?: string;
   TENANT_IGNORED_SUBDOMAINS?: string;
   TENANT_ALLOW_HEADER_OVERRIDE?: string;
+  DRAW_ENABLED?: string;
 };
 
 type Rifa = {
@@ -334,6 +335,10 @@ app.get('/api/rifas/:id/numeros-comprados', async (c) => {
 });
 
 app.post('/api/rifas/:id/sorteio', async (c) => {
+  if (c.env.DRAW_ENABLED !== '1') {
+    return c.json({ error: 'Sorteio desabilitado.' }, 403);
+  }
+
   const raffleId = c.req.param('id');
   const tenantId = c.get('tenantId');
 
